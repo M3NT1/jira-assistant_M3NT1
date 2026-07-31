@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 
-import { Modal, Button, TabView, TabPage } from '@components';
+import { Modal, Button, TabView, TabPage, useCloseOnEsc } from '@components';
 
 import { useWorklogStore } from '../datastore';
 import DataSourceSettings from './DataSourceSettings';
@@ -67,6 +67,8 @@ function SettingsDialog({ onHide }: SettingsDialogProps) {
         setIsOpen(false);
         onHide();
     };
+
+    useCloseOnEsc(isOpen, handleClose);
 
     return (
         <Modal isOpen={isOpen} onClose={handleClose} title="Report Configurations" size="xl">

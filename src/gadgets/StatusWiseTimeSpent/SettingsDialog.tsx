@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import JQLEditor from '@/jira-controls/JQLEditor';
 
-import { Button, Modal } from '@components';
+import { Button, Modal, useCloseOnEsc } from '@components';
 
 import type { StatusWiseTimeSpentSettings } from './types';
 
@@ -14,6 +14,8 @@ interface SettingsDialogProps {
 
 export function SettingsDialog({ settings, onSave, onHide }: SettingsDialogProps) {
     const [jql, setJql] = useState(settings.jql || '');
+
+    useCloseOnEsc(true, onHide);
 
     const handleSave = () => {
         onSave({

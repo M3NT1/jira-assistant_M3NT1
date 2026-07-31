@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 
 import { inject } from '@services';
 
-import { Button, Checkbox, Modal, TextInput, type ComponentEvent } from '@components';
+import { Button, Checkbox, Modal, TextInput, useCloseOnEsc, type ComponentEvent } from '@components';
 
 import { notifyReportsListChanged } from '../components/ReportSelectList';
 import { Column, NoDataRow, ScrollableTable, TBody, THead } from '../components/shared/ScrollableTable';
@@ -366,6 +366,8 @@ function ImportReportsDialog({ reportsToImport: initialReports, onHide }: Import
         },
         [onHide],
     );
+
+    useCloseOnEsc(showDialog, handleHide);
 
     const selectedCount = useMemo(() => reports.filter((r) => r.selected).length, [reports]);
 

@@ -4,7 +4,7 @@ import { startOfDay, isBefore, isAfter, isEqual, format as formatDate, parse as 
 
 import { inject } from '@services';
 
-import { Modal, Button, Checkbox, Dropdown, MaskedInput } from '@components';
+import { Modal, Button, Checkbox, Dropdown, MaskedInput, useCloseOnEsc } from '@components';
 
 import type { Worklog } from '@types';
 
@@ -228,6 +228,8 @@ function AddWorklog({ editTracker, worklog: worklogProp, uploadImmediately: uplo
         setShowDialog(false);
         onHide?.();
     }, [onHide]);
+
+    useCloseOnEsc(showDialog, handleHide);
 
     const handleSave = useCallback(
         async (shouldUpload?: boolean | any) => {

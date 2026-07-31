@@ -2,10 +2,15 @@ import React, { Component, ReactNode } from 'react';
 
 import { inject } from '@services';
 
-import { Modal } from '@components';
+import { Modal, useCloseOnEsc } from '@components';
 
 import { EventCategory } from '../constants/settings';
 import type AnalyticsService from '../services/analytics-service';
+
+function EscToClose({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+    useCloseOnEsc(isOpen, onClose);
+    return null;
+}
 
 interface BaseDialogProps {
     onHide?: (result?: any) => void;
@@ -64,6 +69,7 @@ class BaseDialog<P extends BaseDialogProps = BaseDialogProps, S extends BaseDial
 
         return (
             <Modal isOpen={showDialog} onClose={this.onHide} title={title} style={this.style} className={this.className}>
+                <EscToClose isOpen={showDialog} onClose={this.onHide} />
                 <div className="flex flex-col gap-4">
                     {children}
                     {footer && <div className="flex justify-end gap-2 pt-4 border-t border-(--border-color)">{footer}</div>}

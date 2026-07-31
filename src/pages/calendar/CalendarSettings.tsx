@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 
 import { ColorPicker } from '@/controls';
 
-import { Button, Checkbox, Modal, RadioButtonGroup } from '@components';
+import { Button, Checkbox, Modal, RadioButtonGroup, useCloseOnEsc } from '@components';
 
 import type { CalendarSettings as CalendarSettingsType } from './types';
 
@@ -54,6 +54,8 @@ const colorFields: Array<{
 
 export default function CalendarSettings({ settings: initialSettings, onDone, onHide }: CalendarSettingsProps) {
     const [settings, setSettings] = useState<CalendarSettingsType>({ ...initialSettings });
+
+    useCloseOnEsc(true, onHide);
 
     const showMeetingsSection = true;
 

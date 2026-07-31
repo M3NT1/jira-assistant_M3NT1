@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 
 import { inject } from '@services';
 
-import { Button, Modal } from '@components';
+import { Button, Modal, useCloseOnEsc } from '@components';
 
 import { MultiValueText } from '../controls/MultiValueText';
 
@@ -26,6 +26,8 @@ export default function AddBookmark({ onHide }: AddBookmarkProps) {
         },
         [onHide],
     );
+
+    useCloseOnEsc(showDialog, handleHide);
 
     const addBookmark = useCallback(async () => {
         if (ticketsList.length > 0) {

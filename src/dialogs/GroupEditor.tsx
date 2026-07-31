@@ -4,7 +4,7 @@ import type { UserGroup as UserGroupType } from '@/types';
 
 import { inject } from '@services';
 
-import { Modal } from '@components';
+import { Modal, useCloseOnEsc } from '@components';
 
 import UserGroup from '../components/user-group/UserGroup';
 import { EventCategory } from '../constants/settings';
@@ -33,6 +33,8 @@ function GroupEditor({ groups: initialGroups, onHide }: GroupEditorProps) {
     const handleDone = (groups: UserGroupType[]) => {
         handleClose(groups);
     };
+
+    useCloseOnEsc(isOpen, handleClose);
 
     return (
         <Modal isOpen={isOpen} onClose={() => handleClose()} title="Manage User Groups" size="xl">

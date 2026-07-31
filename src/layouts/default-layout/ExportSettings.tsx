@@ -10,7 +10,7 @@ import type { BackupSettings } from '@/services/backup-service';
 
 import { inject } from '@services';
 
-import { Button, Checkbox, Modal } from '@components';
+import { Button, Checkbox, Modal, useCloseOnEsc } from '@components';
 
 import { saveStringAs } from '@utils/helpers';
 
@@ -79,6 +79,8 @@ export default function ExportSettings({ onDone, onHide }: ExportSettingsProps) 
         setShowDialog(false);
         onHide();
     }, [onHide]);
+
+    useCloseOnEsc(showDialog, handleClose);
 
     const footer = (
         <div className="flex items-center justify-between gap-3 w-full">
