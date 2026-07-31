@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react';
 
 import classNames from 'classnames';
 
-import { inject } from '@services';
-
 import { Button, Loading } from '@components';
 
 import { gadgetList, type GadgetInfo } from '../../../gadgets/gadget-list';
@@ -26,34 +24,10 @@ export function AddGadget({ show, onHide, addedGadgets, addGadget, removeGadget 
     }, [show, gadgets]);
 
     const loadGadgetList = async () => {
-        const { $report } = inject('ReportService');
-
-        try {
-            const reports = (await $report.getReportsList()).filter((r: any) => r.reportType !== 'pivot');
-
-            if (!reports?.length) {
-                setGadgets(gadgetList);
-                return;
-            }
-
-            const reportGadgets = reports.map((r: any) => ({
-                id: `${r.advanced ? 'AR' : r.isNew ? 'CR' : 'SQ'}:${r.id}:${r.queryName}`,
-                icon: 'fa-filter',
-                name: r.queryName,
-                isOld: !(r.isNew || r.advanced),
-                details: !r.advanced
-                    ? `${r.outputCount} columns displayed in table format${
-                          r.isNew
-                              ? ' with interactive option to sort and group based on columns.'
-                              : ' (deprecated, not allowed to add to dashboard)'
-                      }`
-                    : '<no details available>',
-            }));
-
-            setGadgets([...gadgetList, ...reportGadgets]);
-        } catch (error) {
-            setGadgets(gadgetList);
-        }
+        // Report viewers are not migrated to v3 yet (gadget-registry maps CR/AR/SQ to a
+        // placeholder), so saved reports are deliberately not offered here: adding one
+        // would only produce an empty card. Restore this once a viewer exists.
+        setGadgets(gadgetList);
     };
 
     const containerClassName = classNames(

@@ -19,6 +19,20 @@ interface GadgetComponentInfo {
     props?: Record<string, any>;
 }
 
+/**
+ * Report viewers are not migrated yet, so a saved report placed on a dashboard cannot be
+ * rendered. Say so plainly instead of calling it an unknown gadget.
+ */
+function unavailableReport(kind: string, name?: string): GadgetComponentInfo {
+    return {
+        Component: BaseGadgetUnavailable,
+        props: {
+            title: name || kind,
+            message: `${kind} gadgets are not available in this version yet. Open the report from the Reports menu to view its data.`,
+        },
+    };
+}
+
 export function getGadgetComponent(gadgetName: string, opts: string[] = []): GadgetComponentInfo | null {
     const gadgetMap: Record<string, () => GadgetComponentInfo> = {
         myOpenTickets: () => ({ Component: MyOpenTickets, props: { title: GadgetTitle.OpenTicket } }),
@@ -55,18 +69,9 @@ export function getGadgetComponent(gadgetName: string, opts: string[] = []): Gad
             props: { viewMode: 'listMonth', title: 'Calendar - Month List' },
         }),
 
-        CR: () => ({
-            Component: BaseGadgetUnavailable,
-            props: { title: opts[1] || 'Custom Report' },
-        }),
-        AR: () => ({
-            Component: BaseGadgetUnavailable,
-            props: { title: opts[1] || 'Advanced Report' },
-        }),
-        SQ: () => ({
-            Component: BaseGadgetUnavailable,
-            props: { title: opts[1] || 'Saved Query' },
-        }),
+        CR: () => unavailableReport('Custom report', opts[1]),
+        AR: () => unavailableReport('Advanced report', opts[1]),
+        SQ: () => unavailableReport('Saved query', opts[1]),
     };
 
     const gadgetFactory = gadgetMap[gadgetName];
