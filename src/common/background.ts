@@ -35,6 +35,8 @@ interface RequestDetails {
 
 const svcAllowedFromUnknownPage = ['SELF', 'WorklogTimerService', 'SettingsService'];
 
+const TIMER_CHECK_ALARM = 'ja-timer-daycheck';
+
 injectServices();
 const services: any = {};
 inject(services, 'AjaxRequestService', 'AppBrowserService', 'StorageService', 'SettingsService', 'MessageService', 'WorklogTimerService');
@@ -47,8 +49,31 @@ function startListening(): void {
     } else {
         chrome.runtime.onMessage.addListener(onRequestReceived);
     }
+
+    // MV3: listeners must be registered synchronously on service worker startup,
+    // or the browser will not wake the worker for these events after it is terminated
+    if (chrome.idle) {
+        chrome.idle.onStateChanged.addListener(systemStateChanged);
+    }
+
+    if (chrome.alarms) {
+        chrome.alarms.onAlarm.addListener(onAlarmFired);
+        // Periodic wake up: setInterval/setTimeout die with the MV3 service worker,
+        // so a recurring alarm is the only reliable background heartbeat.
+        // getCurrentTimer also finalizes any timer left running past its day.
+        chrome.alarms.create(TIMER_CHECK_ALARM, { periodInMinutes: 15 });
+    }
+
     loadSettings();
     console.log('Started listening for incomming requests', new Date());
+}
+
+function onAlarmFired(alarm: { name?: string }): void {
+    if (alarm?.name !== TIMER_CHECK_ALARM) {
+        return;
+    }
+
+    services.$wltimer.getCurrentTimer().catch((err: any) => error('Scheduled timer check failed', err));
 }
 
 function onRequestReceived(message: MessageRequest, sender: MessageSender, sendResponse: (response: MessageResponse) => void): boolean {
@@ -130,7 +155,6 @@ function error(...args: any[]): void {
     console.error(...args);
 }
 
-let stateChangeAttached = false;
 const settings: Record<string, any> = {};
 
 async function loadSettings(): Promise<void> {
@@ -140,18 +164,6 @@ async function loadSettings(): Promise<void> {
 
         settings.TR_PauseOnLock = TR_PauseOnLock;
         settings.TR_PauseOnIdle = TR_PauseOnIdle;
-
-        if (TR_PauseOnLock || TR_PauseOnIdle) {
-            if (!stateChangeAttached) {
-                chrome.idle.onStateChanged.addListener(systemStateChanged);
-                stateChangeAttached = true;
-                log('Listening for system state changes');
-            }
-        } else if (stateChangeAttached) {
-            chrome.idle.onStateChanged.removeListener(systemStateChanged);
-            stateChangeAttached = false;
-            log('Deregistered listening to system state');
-        }
 
         services.$jaBrowserExtn.persistBackground(TR_PauseOnIdle || TR_PauseOnLock);
     }
@@ -193,6 +205,13 @@ async function loadSettings(): Promise<void> {
 
 async function systemStateChanged(state: string): Promise<void> {
     log('System state changed to ', state);
+
+    // The settings cache is empty when the service worker was just woken up by this event
+    if (settings.TR_PauseOnLock === undefined && settings.TR_PauseOnIdle === undefined) {
+        settings.TR_PauseOnLock = await services.$settings.get('TR_PauseOnLock');
+        settings.TR_PauseOnIdle = await services.$settings.get('TR_PauseOnIdle');
+    }
+
     switch (state?.toLowerCase()) {
         case 'idle':
             if (settings.TR_PauseOnIdle) {

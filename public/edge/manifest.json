@@ -53,7 +53,7 @@
         "extension_pages": "script-src 'self' ; object-src 'self'; frame-src https://www.youtube.com;"
     },
     "offline_enabled": true,
-    "permissions": ["tabs", "identity", "storage", "background", "notifications", "activeTab", "idle", "scripting", "unlimitedStorage"],
+    "permissions": ["tabs", "identity", "storage", "background", "notifications", "activeTab", "idle", "scripting", "unlimitedStorage", "alarms"],
     "host_permissions": ["https://*.atlassian.net/*"],
     "optional_host_permissions": ["http://*/", "https://*/"],
     "author": "Shridhar",

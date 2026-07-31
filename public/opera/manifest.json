@@ -53,7 +53,7 @@
         "extension_pages": "script-src 'self' ; object-src 'self'; frame-src https://www.youtube.com;"
     },
     "offline_enabled": true,
-    "permissions": ["activeTab", "identity", "storage", "idle", "scripting", "tabs", "unlimitedStorage"],
+    "permissions": ["activeTab", "identity", "storage", "idle", "scripting", "tabs", "unlimitedStorage", "alarms"],
     "host_permissions": ["https://*.atlassian.net/*"],
     "optional_host_permissions": ["http://*/", "https://*/"],
     "developer": {
