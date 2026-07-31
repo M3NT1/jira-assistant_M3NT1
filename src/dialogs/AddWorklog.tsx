@@ -354,6 +354,7 @@ function AddWorklog({ editTracker, worklog: worklogProp, uploadImmediately: uplo
                             <DateTimePicker
                                 value={log.dateStarted}
                                 showTime={true}
+                                showDayNav={true}
                                 onChange={(val) => updateField('dateStarted', val)}
                                 className="w-full"
                             />
