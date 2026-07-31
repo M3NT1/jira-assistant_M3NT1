@@ -185,7 +185,20 @@ export default class WorklogService {
             return promise!;
         });
 
-        await Promise.all(promises);
+        // Wait for every ticket group so a single failure does not leave the
+        // other uploads unobserved; then surface an aggregated error (issue #426)
+        const results = await Promise.allSettled(promises);
+        const failures = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+
+        if (failures.length) {
+            const firstError: any = failures[0].reason || {};
+            const message =
+                failures.length === 1
+                    ? firstError.message || 'Failed to upload worklog'
+                    : `Upload failed for ${failures.length} tickets. First error: ${firstError.message || 'unknown error'}`;
+            throw { ...firstError, message };
+        }
+
         return sameObjects ? worklogs.map((w: any) => this.getWLCalendarEntry(w)) : this.getPendingWorklogs();
     }
 
@@ -261,20 +274,35 @@ export default class WorklogService {
         }
 
         return uploadRequest.catch((err: any) => {
-            if (err.status === 400) {
-                console.error(`Error uploading worklog to ${ticketNo}.`, err);
-                const errors = (err.error || {}).errorMessages || [];
-                let message = null;
+            console.error(`Error uploading worklog to ${ticketNo}.`, err);
 
+            // Always reject with a user displayable message so that upload failures
+            // never go unnoticed in the UI (issue #426)
+            const errors = (err?.error || {}).errorMessages || [];
+            const status = err?.status;
+            let message: string;
+
+            if (status === 400) {
                 if (errors.some((e: string) => e.includes('non-editable') || e.includes('permission'))) {
                     message = `Permission denied to log work on ${ticketNo}`;
+                } else if (errors.length) {
+                    message = `Unable to upload worklog for ${ticketNo}: ${errors.join(', ')}`;
                 } else {
                     message = `Unable to upload worklog for ${ticketNo}. Look at console for more details`;
                 }
-
-                return Promise.reject({ message });
+            } else if (status === 401) {
+                message = `Not authenticated with Jira while uploading worklog for ${ticketNo}. Please verify your credentials or session.`;
+            } else if (status === 403) {
+                message = `Permission denied to log work on ${ticketNo}`;
+            } else if (status === 429) {
+                message = `Jira request limit reached while uploading worklog for ${ticketNo}. Wait a few minutes and upload again.`;
+            } else if (status >= 500) {
+                message = `Jira server error (HTTP ${status}) while uploading worklog for ${ticketNo}. Try again later.`;
+            } else {
+                message = `Unable to upload worklog for ${ticketNo}${status ? ` (HTTP ${status})` : ''}. Look at console for more details`;
             }
-            return Promise.reject(err);
+
+            return Promise.reject({ ...err, message });
         });
     }
 
