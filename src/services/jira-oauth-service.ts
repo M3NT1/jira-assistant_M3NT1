@@ -1,5 +1,5 @@
-import { executeService } from '@/common';
-import { ApiUrls, isAppBuild, jaJiraTokenExchangeUrl } from '@/constants';
+import { decryptText, encryptText, isEncryptedCredential } from '@/common';
+import { ApiUrls, jaJiraTokenExchangeUrl } from '@/constants';
 import { clearEnd } from '@/utils';
 
 import type AjaxRequestService from './ajax-request-service';
@@ -36,12 +36,7 @@ export default class JiraAuthService {
             getBasicTokenHeader(uid, pwd),
         );
 
-        let encryptedPwd: string;
-        if (isAppBuild) {
-            encryptedPwd = await executeService('SELF', 'encryptData', [pwd]);
-        } else {
-            encryptedPwd = btoa(pwd);
-        }
+        const encryptedPwd = await encryptText(pwd);
 
         const userId = await this.$user.createUser(profile, url, { authType: 'C', uid, pwd: encryptedPwd });
 
@@ -118,12 +113,13 @@ export default class JiraAuthService {
 
         const user = await this.$user.getUser(userId);
         if (user.authType === 'C') {
-            let pwd: string;
+            const pwd = user.pwd && (await decryptText(user.pwd));
 
-            if (isAppBuild) {
-                pwd = await executeService('SELF', 'decryptData', [user.pwd]);
-            } else {
-                pwd = user.pwd && atob(user.pwd);
+            // Transparently upgrade credentials stored by older versions with plain base64
+            if (user.pwd && pwd && !isEncryptedCredential(user.pwd)) {
+                encryptText(pwd)
+                    .then((encrypted) => this.$user.updateUserCredential(userId, encrypted))
+                    .catch((err) => console.warn('Unable to upgrade stored credential encryption', err));
             }
 
             return { ...customHeaders, ...getBasicTokenHeader(user.uid, pwd) };

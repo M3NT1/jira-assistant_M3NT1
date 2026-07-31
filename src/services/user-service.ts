@@ -29,6 +29,13 @@ export default class UserService {
         return this.$storage.getUser(userId);
     }
 
+    async updateUserCredential(userId: number, pwd: string): Promise<void> {
+        const user = await this.getUser(userId);
+        if (user) {
+            await this.$storage.addOrUpdateUser({ ...user, pwd });
+        }
+    }
+
     getAllUsers(): Promise<any[]> {
         return this.$storage.getAllUsers();
     }
