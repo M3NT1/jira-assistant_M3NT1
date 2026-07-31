@@ -1,5 +1,7 @@
 import { defaultSettings } from '@/constants';
 
+import { getUserName } from '@utils';
+
 import type JiraService from './jira-service';
 import type SessionService from './session-service';
 import type UserUtilsService from './userutils-service';
@@ -65,9 +67,11 @@ export default class JiraUpdatesService {
             return obj;
         }, {});
 
+        // Match on the Jira user name rather than the e-mail address: Server / DC hides
+        // emailAddress under its privacy settings, which makes every author comparison fail
         const notifications = this.extractUpdates(
             updatedIssues,
-            this.$session.CurrentUser?.jiraUser?.emailAddress?.toLowerCase(),
+            (getUserName(this.$session.CurrentUser?.jiraUser || {}, true) || '').toLowerCase(),
             fieldNames,
         );
 
@@ -89,31 +93,32 @@ export default class JiraUpdatesService {
         return { list, total: notifications.length, ticketCount: list.length };
     }
 
-    extractUpdates(issues: any[], currentUserEmail: string, fieldNames: any): any[] {
+    extractUpdates(issues: any[], currentUserName: string, fieldNames: any): any[] {
         const result: any[] = [];
+        const isCurrentUser = (user: any) => !!currentUserName && getUserName(user || {}, true) === currentUserName;
 
         issues.forEach(({ key, summary, assignee, reporter, lastViewed, histories, comments }: any) => {
             let reason = '';
-            if (assignee?.emailAddress?.toLowerCase() === currentUserEmail) {
+            if (isCurrentUser(assignee)) {
                 reason = 'assigned to you';
-            } else if (reporter?.emailAddress?.toLowerCase() === currentUserEmail) {
+            } else if (isCurrentUser(reporter)) {
                 reason = 'reported by you';
             }
 
             if (histories?.length) {
                 histories.forEach(({ author, created, items }: any) => {
                     const createdDate = created && new Date(created);
-                    if (
-                        author?.emailAddress?.toLowerCase() !== currentUserEmail &&
-                        (!createdDate || !lastViewed || createdDate > new Date(lastViewed))
-                    ) {
+                    if (!isCurrentUser(author) && (!createdDate || !lastViewed || createdDate > new Date(lastViewed))) {
                         const date = createdDate;
                         const sortBy = date.getTime();
-                        items.forEach(({ field, fromString, toString }: any) => {
+                        items.forEach(({ field, fieldId, fromString, toString }: any) => {
                             if (!fromString) {
                                 fromString = 'NONE';
                             }
-                            result.push({ date, sortBy, author, field: fieldNames[field], fromString, toString, key, summary, reason });
+                            // Changelog items carry the field id for custom fields and the display
+                            // name for system fields, so both have to be tried before falling back
+                            const fieldName = fieldNames[fieldId] || fieldNames[field] || field;
+                            result.push({ date, sortBy, author, field: fieldName, fromString, toString, key, summary, reason });
                         });
                     }
                 });
