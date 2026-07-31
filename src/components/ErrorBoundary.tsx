@@ -38,35 +38,10 @@ class ErrorBoundary extends Component<Props, State> {
             errorInfo,
         });
 
+        // No error reporting endpoint exists in any build target (extension / web / plugin),
+        // so crashes are only logged locally
         console.error('Error caught by boundary:', error, errorInfo);
-
-        this.reportError(error, errorInfo);
     }
-
-    reportError = (error: Error, errorInfo: ErrorInfo) => {
-        try {
-            const errorData = {
-                message: error.message,
-                stack: error.stack,
-                componentStack: errorInfo.componentStack,
-                timestamp: new Date().toISOString(),
-                userAgent: navigator.userAgent,
-                url: window.location.href,
-            };
-
-            fetch('/api/errors/report', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(errorData),
-            }).catch((err) => {
-                console.error('Failed to report error:', err);
-            });
-        } catch (reportingError) {
-            console.error('Error while reporting error:', reportingError);
-        }
-    };
 
     handleReset = () => {
         this.setState({
