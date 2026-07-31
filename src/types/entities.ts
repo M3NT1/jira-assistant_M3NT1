@@ -7,7 +7,8 @@ export interface User {
     emailAddress?: string;
     displayName?: string;
     accountId?: string;
-    authType?: 'C' | 'O';
+    // C = basic credentials, O = OAuth (Cloud), T = personal access token (Server / DC)
+    authType?: 'C' | 'O' | 'T';
     uid?: string;
     pwd?: string;
     lastLogin: Date;

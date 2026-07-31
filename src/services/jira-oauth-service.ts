@@ -46,6 +46,27 @@ export default class JiraAuthService {
         return userId;
     }
 
+    /**
+     * Integrate using a Personal Access Token (Jira Server / Data Center 8.14+).
+     * The token is sent as a Bearer header and no password is ever stored.
+     */
+    async integrateWithPAT(url: string, token: string): Promise<number> {
+        const profile = await this.$request.execute(
+            'GET',
+            clearEnd(url, '/') + ApiUrls.mySelf.substring(1),
+            null,
+            getBearerTokenHeader(token),
+        );
+
+        const encryptedToken = await encryptText(token);
+
+        const userId = await this.$user.createUser(profile, url, { authType: 'T', pwd: encryptedToken });
+
+        await this.$settings.set('CurrentUserId', userId);
+
+        return userId;
+    }
+
     async integrate(code: string): Promise<any> {
         try {
             return {
@@ -112,17 +133,19 @@ export default class JiraAuthService {
         }
 
         const user = await this.$user.getUser(userId);
-        if (user.authType === 'C') {
-            const pwd = user.pwd && (await decryptText(user.pwd));
+        if (user.authType === 'C' || user.authType === 'T') {
+            const secret = user.pwd && (await decryptText(user.pwd));
 
             // Transparently upgrade credentials stored by older versions with plain base64
-            if (user.pwd && pwd && !isEncryptedCredential(user.pwd)) {
-                encryptText(pwd)
+            if (user.pwd && secret && !isEncryptedCredential(user.pwd)) {
+                encryptText(secret)
                     .then((encrypted) => this.$user.updateUserCredential(userId, encrypted))
                     .catch((err) => console.warn('Unable to upgrade stored credential encryption', err));
             }
 
-            return { ...customHeaders, ...getBasicTokenHeader(user.uid, pwd) };
+            const authHeader = user.authType === 'T' ? getBearerTokenHeader(secret) : getBasicTokenHeader(user.uid, secret);
+
+            return { ...customHeaders, ...authHeader };
         } else if (user.apiUrl) {
             let auth = await this.$settings.getGeneralSetting(userId, 'JOAT');
             if (auth) {

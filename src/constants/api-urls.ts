@@ -8,6 +8,7 @@ export const ApiUrls = {
     getAllIssueTypes: '~/rest/api/2/issuetype',
 
     // Search APIs
+    // v3 /search/jql is Cloud only; Server/DC (e.g. v8.x/9.x) supports only v2 /search
     search: '~/rest/api/3/search/jql',
     searchLegacyV2: '~/rest/api/2/search',
     searchIssueForPicker: '~/rest/api/2/issue/picker',
@@ -18,6 +19,7 @@ export const ApiUrls = {
     cloneIssue: '~/rest/internal/2/issue/{0}/clone',
     bulkImportIssue: '~/rest/api/2/issue/bulk',
     taskStatus: '~/rest/api/3/task/{0}',
+    issueLink: '~/rest/api/2/issueLink',
 
     // Issue Metadata APIs
     getProjectImportMetadata: '~/rest/api/2/issue/createmeta?expand=projects.issuetypes.fields&projectKeys=',
@@ -34,6 +36,8 @@ export const ApiUrls = {
     searchUser_Alt: '~/rest/api/2/user/search?maxResults={1}&startAt={2}&username={0}',
     searchGroup: '~/rest/api/2/groups/picker?caseInsensitive=true&maxResults={1}&query={0}',
     getGroupMembers: '~/rest/api/2/group/member?maxResults={1}&includeInactiveUsers=true&groupId={0}',
+    // Server/DC has no groupId concept in group APIs; members are fetched by group name
+    getGroupMembersByName: '~/rest/api/2/group/member?maxResults={1}&includeInactiveUsers=true&groupname={0}',
     getUserDetails: '~/rest/api/2/user?username={0}',
     mySelf: '~/rest/api/2/myself',
 
@@ -57,7 +61,7 @@ export const ApiUrls = {
     getSprintProperty: '~/rest/agile/1.0/sprint/{0}/properties/{1}',
     getSprintIssues: '~/rest/agile/1.0/sprint/{0}/issue',
 
-    // Changelog API
+    // Changelog API (Cloud only; Server/DC falls back to search with expand=changelog)
     bulkIssueChangelogs: '~/rest/api/3/changelog/bulkfetch',
 
     // External OAuth URLs

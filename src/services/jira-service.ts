@@ -33,6 +33,14 @@ export default class JiraService {
         this.runningRequests = {};
     }
 
+    /**
+     * True only for Atlassian Cloud instances. Server / Data Center (e.g. Jira 8.x / 9.x)
+     * does not serve the v3 REST APIs, so all v3-only endpoints must be avoided there.
+     */
+    private get isCloudInstance(): boolean {
+        return this.$session.CurrentUser?.isAtlasCloud === true;
+    }
+
     async searchTickets(
         jql: string,
         fields?: string[],
@@ -49,46 +57,70 @@ export default class JiraService {
         const fieldsToUse = fields || defaultJiraFields;
         const { worklogStartDate, worklogEndDate } = opts || {};
 
-        try {
-            const postData: any = {
-                jql,
-                fields: fieldsToUse,
-                maxResults: opts?.maxResults || 1000,
-            };
-
-            if (opts?.expand?.length) {
-                postData.expand = opts.expand;
-            }
-
-            if (nextPageToken) {
-                postData.nextPageToken = nextPageToken;
-            }
-
-            const result = await this.$ajax.get(prepareUrlWithQueryString(ApiUrls.search, postData));
-
-            const issues = result.issues || [];
-
-            if (opts?.ignoreWarnings !== true) {
-                if (result.warningMessages?.length) {
-                    const msg = result.warningMessages.join('\r\n');
-                    this.$message.warning(msg, 'Query Error');
+        // Server / DC (e.g. Jira 8.x) serves only the v2 search API; going straight to v2
+        // avoids a guaranteed 404 round-trip on every search
+        if (!this.isCloudInstance) {
+            try {
+                return await this.searchTicketsFallback_V2(jql, fieldsToUse, undefined, opts);
+            } catch (err: any) {
+                // 404 / 410 means the v2 endpoint itself is unavailable (e.g. a Cloud
+                // instance behind a custom domain); retry with the v3 API below
+                if (err?.status !== 404 && err?.status !== 410) {
+                    throw err;
                 }
+                console.warn('v2 search API unavailable. Retrying with v3 search API.', err);
             }
+        }
 
-            // Process worklog comments
-            if (fieldsToUse.includes('worklog')) {
-                await this.validateForWorklogs(issues, worklogStartDate, worklogEndDate);
-            }
+        const allIssues: any[] = [];
+        let pageToken: string | undefined = nextPageToken;
+        let isFirstCall = !nextPageToken;
 
-            // Handle pagination using v3 API tokens
-            if (!opts?.maxResults && result.nextPageToken && !result.isLast && issues.length > 0) {
-                const nextResults = await this.searchTickets(jql, fieldsToUse, result.nextPageToken, opts);
-                issues.push(...nextResults);
-            }
+        try {
+            do {
+                const postData: any = {
+                    jql,
+                    fields: fieldsToUse,
+                    maxResults: opts?.maxResults || 1000,
+                };
 
-            return issues;
+                if (opts?.expand?.length) {
+                    postData.expand = opts.expand;
+                }
+
+                if (pageToken) {
+                    postData.nextPageToken = pageToken;
+                }
+
+                const result = await this.$ajax.get(prepareUrlWithQueryString(ApiUrls.search, postData));
+
+                const issues = result.issues || [];
+
+                if (opts?.ignoreWarnings !== true) {
+                    if (result.warningMessages?.length) {
+                        const msg = result.warningMessages.join('\r\n');
+                        this.$message.warning(msg, 'Query Error');
+                    }
+                }
+
+                // Process worklog comments
+                if (fieldsToUse.includes('worklog')) {
+                    await this.validateForWorklogs(issues, worklogStartDate, worklogEndDate);
+                }
+
+                allIssues.push(...issues);
+
+                // Handle pagination using v3 API tokens
+                pageToken =
+                    !opts?.maxResults && result.nextPageToken && !result.isLast && issues.length > 0
+                        ? result.nextPageToken
+                        : undefined;
+                isFirstCall = false;
+            } while (pageToken);
+
+            return allIssues;
         } catch (err: any) {
-            if (!nextPageToken) {
+            if (isFirstCall) {
                 // Fallback to v2 only for the failure in first call
                 console.error('JQL v3 search failed. Fallback to v2 search', err);
                 return this.searchTicketsFallback_V2(jql, fieldsToUse, undefined, opts);
@@ -121,47 +153,52 @@ export default class JiraService {
             ignoreErrors?: boolean;
         },
     ): Promise<any[]> {
-        const startAtValue = startAt || 0;
         const fieldsToUse = fields || defaultJiraFields;
         const { worklogStartDate, worklogEndDate } = opts || {};
 
-        const postData: any = {
-            jql,
-            fields: fieldsToUse,
-            maxResults: opts?.maxResults || 1000,
-        };
-
-        if (opts?.expand?.length) {
-            postData.expand = opts.expand;
-        }
-
-        if (startAtValue > 0) {
-            postData.startAt = startAtValue;
-        }
+        const allIssues: any[] = [];
+        let startAtValue = startAt || 0;
+        let hasMore = false;
 
         try {
-            const result = await this.$ajax.get(prepareUrlWithQueryString(ApiUrls.searchLegacyV2, postData));
-            const issues = result.issues || [];
-            const total = result.total;
+            do {
+                const postData: any = {
+                    jql,
+                    fields: fieldsToUse,
+                    maxResults: opts?.maxResults || 1000,
+                };
 
-            if (opts?.ignoreWarnings !== true) {
-                if (result.warningMessages?.length) {
-                    const msg = result.warningMessages.join('\r\n');
-                    this.$message.warning(msg, 'Query Error');
+                if (opts?.expand?.length) {
+                    postData.expand = opts.expand;
                 }
-            }
 
-            if (fieldsToUse.includes('worklog')) {
-                await this.validateForWorklogs(issues, worklogStartDate, worklogEndDate);
-            }
+                if (startAtValue > 0) {
+                    postData.startAt = startAtValue;
+                }
 
-            // Handle pagination
-            if (!opts?.maxResults && issues.length + startAtValue < total && issues.length > 0) {
-                const nextResults = await this.searchTicketsFallback_V2(jql, fieldsToUse, startAtValue + issues.length, opts);
-                issues.push(...nextResults);
-            }
+                const result = await this.$ajax.get(prepareUrlWithQueryString(ApiUrls.searchLegacyV2, postData));
+                const issues = result.issues || [];
+                const total = result.total;
 
-            return issues;
+                if (opts?.ignoreWarnings !== true) {
+                    if (result.warningMessages?.length) {
+                        const msg = result.warningMessages.join('\r\n');
+                        this.$message.warning(msg, 'Query Error');
+                    }
+                }
+
+                if (fieldsToUse.includes('worklog')) {
+                    await this.validateForWorklogs(issues, worklogStartDate, worklogEndDate);
+                }
+
+                allIssues.push(...issues);
+                startAtValue += issues.length;
+
+                // Handle pagination
+                hasMore = !opts?.maxResults && issues.length > 0 && startAtValue < total;
+            } while (hasMore);
+
+            return allIssues;
         } catch (err: any) {
             if (opts?.ignoreErrors !== true) {
                 const messages = err.error?.errorMessages;
@@ -451,6 +488,11 @@ export default class JiraService {
     }
 
     async cloneIssue(key: string, summary: string, fields?: any): Promise<any> {
+        // The internal clone API and the v3 task API exist only on Cloud
+        if (!this.isCloudInstance) {
+            return this.cloneIssueManually(key, summary, fields);
+        }
+
         const task = await this.$ajax.post(ApiUrls.cloneIssue, { includeAttachments: true, summary, optionalFields: fields || {} }, key);
 
         if (task.taskId) {
@@ -465,6 +507,60 @@ export default class JiraService {
         }
 
         return task;
+    }
+
+    /**
+     * Server / DC has no clone REST API; replicate it by creating a new issue
+     * with the commonly clonable fields copied from the source issue
+     */
+    private async cloneIssueManually(key: string, summary: string, optionalFields?: any): Promise<any> {
+        const cloneableFields = 'project,issuetype,summary,description,priority,labels,components,fixVersions';
+        const source = await this.$ajax.get(`${ApiUrls.individualIssue}?fields=${cloneableFields}`, key);
+        const src = source?.fields || {};
+
+        const fields: any = {
+            summary: summary || src.summary,
+            ...(optionalFields || {}),
+        };
+
+        if (src.project?.id) {
+            fields.project = { id: src.project.id };
+        }
+        if (src.issuetype?.id) {
+            fields.issuetype = { id: src.issuetype.id };
+        }
+        if (src.description) {
+            fields.description = src.description;
+        }
+        if (src.priority?.id) {
+            fields.priority = { id: src.priority.id };
+        }
+        if (src.labels?.length) {
+            fields.labels = src.labels;
+        }
+        if (src.components?.length) {
+            fields.components = src.components.map((c: any) => ({ id: c.id }));
+        }
+        if (src.fixVersions?.length) {
+            fields.fixVersions = src.fixVersions.map((v: any) => ({ id: v.id }));
+        }
+
+        const created = await this.createIssue(fields);
+
+        // Best effort: link the clone to its source the same way Jira's own clone does
+        if (created?.key) {
+            try {
+                await this.$ajax.post(ApiUrls.issueLink, {
+                    type: { name: 'Cloners' },
+                    inwardIssue: { key: created.key },
+                    outwardIssue: { key },
+                });
+            } catch (err) {
+                console.warn(`Unable to add "Cloners" link between ${created.key} and ${key}`, err);
+            }
+        }
+
+        return created;
     }
 
     deleteIssue(issuekey: string): Promise<any> {
@@ -822,11 +918,16 @@ export default class JiraService {
     async searchUsers(text: string, maxResult = 10, startAt = 0): Promise<any[]> {
         let result = null;
 
+        // Cloud searches users with the "query" param, Server / DC with "username";
+        // the other variant is kept as a safety net
+        const primaryUrl = this.isCloudInstance ? ApiUrls.searchUser : ApiUrls.searchUser_Alt;
+        const fallbackUrl = this.isCloudInstance ? ApiUrls.searchUser_Alt : ApiUrls.searchUser;
+
         try {
-            result = await this.$ajax.get(ApiUrls.searchUser, text, maxResult, startAt);
+            result = await this.$ajax.get(primaryUrl, text, maxResult, startAt);
         } catch (err) {
             console.warn('User search failed. Using alternate search mechanism.', err);
-            result = await this.$ajax.get(ApiUrls.searchUser_Alt, text, maxResult, startAt);
+            result = await this.$ajax.get(fallbackUrl, text, maxResult, startAt);
         }
 
         return result;
@@ -837,13 +938,15 @@ export default class JiraService {
         return result?.groups;
     }
 
-    async getGroupMembers(groupId: string, maxResult = 50): Promise<any[]> {
-        const users = this.$jaCache.session.get(`JiraGroup_${groupId}_Users`);
+    async getGroupMembers(groupIdOrName: string, maxResult = 50): Promise<any[]> {
+        const users = this.$jaCache.session.get(`JiraGroup_${groupIdOrName}_Users`);
         if (users) {
             return Promise.resolve(users);
         }
 
-        const result = await this.$ajax.get(ApiUrls.getGroupMembers, groupId, maxResult);
+        // Cloud identifies groups by groupId; Server / DC only by group name
+        const url = this.isCloudInstance ? ApiUrls.getGroupMembers : ApiUrls.getGroupMembersByName;
+        const result = await this.$ajax.get(url, groupIdOrName, maxResult);
         return result?.values;
     }
 
@@ -894,6 +997,16 @@ export default class JiraService {
     }
 
     async getBulkIssueChangelogs(issueIdsOrKeys: string[], fieldIds?: string[]): Promise<Record<string, any[]>> {
+        if (!issueIdsOrKeys?.length) {
+            return {};
+        }
+
+        // The changelog bulkfetch API exists only on Cloud; Server / DC pulls
+        // the same data through search with expand=changelog
+        if (!this.isCloudInstance) {
+            return this.getBulkIssueChangelogsFromSearch(issueIdsOrKeys, fieldIds);
+        }
+
         try {
             const { issueChangeLogs } = await this.$ajax.post(ApiUrls.bulkIssueChangelogs, {
                 maxResults: 10000,
@@ -907,6 +1020,65 @@ export default class JiraService {
                 );
                 return obj;
             }, {});
+        } catch (err) {
+            console.error('Unable to fetch changelogs for tickets: ', err);
+            return {};
+        }
+    }
+
+    private async getBulkIssueChangelogsFromSearch(issueIdsOrKeys: string[], fieldIds?: string[]): Promise<Record<string, any[]>> {
+        try {
+            // Server changelog items carry field display names ("Sprint") while callers
+            // filter by field ids (customfield_xxxxx); build a name -> id map to bridge that
+            let fieldNameToId: Record<string, string> = {};
+            try {
+                const allFields = await this.getCustomFields();
+                fieldNameToId = allFields.reduce((map: Record<string, string>, f: any) => {
+                    if (f?.name && f?.id) {
+                        map[f.name] = f.id;
+                    }
+                    return map;
+                }, {});
+            } catch (err) {
+                console.warn('Unable to load field list for changelog mapping', err);
+            }
+
+            const fieldFilter = fieldIds?.length ? new Set(fieldIds) : undefined;
+            const result: Record<string, any[]> = {};
+
+            // Keep the JQL short enough for a GET request even with many issues
+            const batchSize = 250;
+            for (let i = 0; i < issueIdsOrKeys.length; i += batchSize) {
+                const batch = issueIdsOrKeys.slice(i, i + batchSize);
+                const jql = `key IN (${batch.join(',')})`;
+
+                const issues = await this.searchTickets(jql, ['created'], undefined, {
+                    expand: ['changelog'],
+                    ignoreWarnings: true,
+                    ignoreErrors: true,
+                });
+
+                issues.forEach((issue: any) => {
+                    const histories = issue.changelog?.histories || [];
+                    const flatLogs = orderBy(histories, (ch: any) => ch.created).flatMap(({ items, ...ch }: any) =>
+                        (items || []).map((item: any) => ({
+                            ...ch,
+                            ...item,
+                            fieldId: item.fieldId || fieldNameToId[item.field] || item.field,
+                        })),
+                    );
+
+                    const logs = fieldFilter
+                        ? flatLogs.filter((l: any) => fieldFilter.has(l.fieldId) || fieldFilter.has(l.field))
+                        : flatLogs;
+
+                    // Callers look up both by issue key and by issue id
+                    result[issue.key] = logs;
+                    result[issue.id] = logs;
+                });
+            }
+
+            return result;
         } catch (err) {
             console.error('Unable to fetch changelogs for tickets: ', err);
             return {};

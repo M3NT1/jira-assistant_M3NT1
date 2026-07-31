@@ -28,6 +28,7 @@ function BasicAuthIntegration({ setAuthType }: BasicAuthIntegrationProps) {
     const [jiraUrl, setJiraUrl] = useState('');
     const [userId, setUserId] = useState('');
     const [password, setPassword] = useState('');
+    const [usePAT, setUsePAT] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
     const services = useService('MessageService', 'SessionService', 'JiraAuthService', 'AppBrowserService');
@@ -63,7 +64,9 @@ function BasicAuthIntegration({ setAuthType }: BasicAuthIntegrationProps) {
             setIsLoading(true);
 
             try {
-                const id = await services.$jAuth.integrateWithCred(root, userId, password);
+                const id = usePAT
+                    ? await services.$jAuth.integrateWithPAT(root, password)
+                    : await services.$jAuth.integrateWithCred(root, userId, password);
                 await openDashboard(id);
             } catch (response: any) {
                 const res = response || {};
@@ -90,7 +93,7 @@ function BasicAuthIntegration({ setAuthType }: BasicAuthIntegrationProps) {
                 setIsLoading(false);
             }
         },
-        [services, userId, password, openDashboard],
+        [services, userId, password, usePAT, openDashboard],
     );
 
     const integrate = useCallback(() => {
@@ -112,13 +115,25 @@ function BasicAuthIntegration({ setAuthType }: BasicAuthIntegrationProps) {
                     placeholder="Jira root url (eg: https://jira.example.com)"
                     leftIcon={<i className="fa fa-external-link text-[var(--text-tertiary)]" />}
                 />
-                <TextInput
-                    value={userId}
-                    onChange={(e) => setUserId(e.value)}
-                    placeholder="Your Jira login id"
-                    leftIcon={<i className="fa fa-user text-[var(--text-tertiary)]" />}
+                {!usePAT && (
+                    <TextInput
+                        value={userId}
+                        onChange={(e) => setUserId(e.value)}
+                        placeholder="Your Jira login id"
+                        leftIcon={<i className="fa fa-user text-[var(--text-tertiary)]" />}
+                    />
+                )}
+                <Password
+                    value={password}
+                    onChange={(e) => setPassword(e.value)}
+                    placeholder={usePAT ? 'Personal Access Token' : 'Password / Rest API Token'}
                 />
-                <Password value={password} onChange={(e) => setPassword(e.value)} placeholder="Password / Rest API Token" />
+                <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)] cursor-pointer">
+                    <input type="checkbox" checked={usePAT} onChange={(e) => setUsePAT(e.target.checked)} />
+                    <span>
+                        Use <strong>Personal Access Token</strong> (Jira Server / Data Center 8.14 or above)
+                    </span>
+                </label>
             </div>
 
             <p className="text-sm text-[var(--text-secondary)] mb-5">

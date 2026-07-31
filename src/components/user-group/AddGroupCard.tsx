@@ -38,7 +38,8 @@ function AddGroupCard({ onAdd }: AddGroupCardProps) {
 
     const searchGroups = async (query: string) => {
         const results = await $jira.searchGroups(query);
-        setGroupSuggestions((results || []).map((g: any) => ({ label: g.name, value: g.groupId })));
+        // Cloud returns groupId; Server / DC groups have only a name, which is their identifier
+        setGroupSuggestions((results || []).map((g: any) => ({ label: g.name, value: g.groupId || g.name })));
     };
 
     const groupSelected = (e: ComponentEvent<string>) => {
