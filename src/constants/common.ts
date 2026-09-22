@@ -42,3 +42,11 @@ export const DefaultUserDayWiseReportSettings = {
     groupBy: 'date',
     dateFormat: 'DD/MM/YYYY',
 };
+
+/**
+ * How far the timer's start may sit in the future before it counts as the system clock
+ * having moved. A freshly started timer legitimately reports a start equal to "now", and
+ * routine clock corrections (NTP sync, waking from sleep, a VM host) shift it by a few
+ * milliseconds, so only a real jump should be reported.
+ */
+export const ClockDriftToleranceMs = 5000;

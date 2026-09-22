@@ -1,5 +1,7 @@
 import moment from 'moment';
 
+import { ClockDriftToleranceMs } from '@/constants';
+
 import BaseService from './base-service';
 import type SettingsService from './settings-service';
 import type StorageService from './storage-service';
@@ -118,10 +120,11 @@ export default class WorklogTimerService extends BaseService {
         }
         const { started } = timer;
         const curTime = new Date().getTime();
-        if (started >= curTime) {
+        if (started > curTime + ClockDriftToleranceMs) {
             throw new Error('Time mismatch: System time has changed since timer has started');
         }
-        const lapse = curTime - started;
+        // Pausing a timer in the same millisecond it started is valid and means zero elapsed
+        const lapse = Math.max(0, curTime - started);
         timer.lapse += lapse;
         delete timer.started;
         if (auto) {
@@ -157,14 +160,17 @@ export default class WorklogTimerService extends BaseService {
     async stopTimerAndCreateWorklog(timer: TimerEntry, endTime: number): Promise<boolean> {
         const { started } = timer;
         if (started! > 0) {
-            if (started! >= endTime) {
-                if (started! >= new Date().getTime()) {
+            if (started! > endTime) {
+                if (started! > new Date().getTime() + ClockDriftToleranceMs) {
+                    // Genuinely in the future: the entry cannot be turned into a worklog
                     await this.$settings.set('WLTimer', null);
                     throw new Error('Time mismatch: System time has changed since timer has started');
                 }
-                endTime = moment(started).endOf('day').toDate().getTime();
+                // Started after the end of its own day (or a small clock correction):
+                // close it at the end of the day it belongs to rather than discarding it
+                endTime = Math.max(started!, moment(started).endOf('day').toDate().getTime());
             }
-            const lapse = endTime - started!;
+            const lapse = Math.max(0, endTime - started!);
             timer.lapse += lapse;
             delete timer.started;
         }

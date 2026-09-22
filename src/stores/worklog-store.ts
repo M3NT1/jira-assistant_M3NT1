@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 
+import { ClockDriftToleranceMs } from '@/constants';
 import type { WorklogTimer } from '@/types';
 
 import { inject } from '@services';
@@ -40,20 +41,50 @@ interface WorklogState {
     loadTicketList: (startAt?: number) => Promise<void>;
 }
 
+/**
+ * Pure: called on every render of the timer controls, so it must not raise messages.
+ * Callers that change the timer report the error once via reportClockDrift().
+ */
 function getElapseState(timerEntry: WorklogTimer | null): TimerState | null {
     if (!timerEntry) return null;
 
     const { key, started, lapse = 0, description } = timerEntry;
     const curTime = new Date().getTime();
 
-    if (started && started >= curTime) {
-        const { $message } = inject('MessageService');
-        $message.error('System time has changed since timer has started. Please stop and restart the timer.', 'Time mismatch');
+    // Only a real jump counts. A timer started in this same millisecond has
+    // started === curTime, which is a zero-second timer, not a broken clock.
+    if (started && started > curTime + ClockDriftToleranceMs) {
         return { key, lapse: 0, description, isRunning: false, hasError: true };
     }
 
-    const totalMS = (started && started > 0 ? curTime - started : 0) + lapse;
-    return { key, lapse: Math.round(totalMS / 1000), description, isRunning: started ? started > 0 : false };
+    // A small backwards correction within the tolerance must not produce negative time
+    const elapsed = started && started > 0 ? Math.max(0, curTime - started) : 0;
+    return { key, lapse: Math.round((elapsed + lapse) / 1000), description, isRunning: started ? started > 0 : false };
+}
+
+let clockDriftReported = false;
+
+/** Surfaces the clock-drift error once per occurrence rather than on every render */
+function reportClockDrift(state: TimerState | null): void {
+    if (!state?.hasError) {
+        clockDriftReported = false;
+        return;
+    }
+
+    if (clockDriftReported) {
+        return;
+    }
+
+    clockDriftReported = true;
+    const { $message } = inject('MessageService');
+    $message.error('System time has changed since timer has started. Please stop and restart the timer.', 'Time mismatch');
+}
+
+/** Used wherever the timer state actually changes, so drift is reported at most once */
+function toTimerState(entry: WorklogTimer | null): TimerState {
+    const state = getElapseState(entry);
+    reportClockDrift(state);
+    return state || ({} as TimerState);
 }
 
 export function getDispTime(lapse: number) {
@@ -76,7 +107,7 @@ export const useWorklogStore = create<WorklogState>((set, get) => ({
 
         set({
             timerEntry: entry || null,
-            curState: getElapseState(entry || null) || ({} as TimerState),
+            curState: toTimerState(entry || null),
             needReload: oldKey ? oldKey !== entry?.key : false,
         });
     },
@@ -113,14 +144,14 @@ export const useWorklogStore = create<WorklogState>((set, get) => ({
                     const newResult = await $wltimer.startTimer(userId!, key, undefined, true);
                     set({
                         timerEntry: newResult,
-                        curState: getElapseState(newResult) || ({} as TimerState),
+                        curState: toTimerState(newResult),
                         needReload: true,
                     });
                 }
             } else {
                 set({
                     timerEntry: result,
-                    curState: getElapseState(result) || ({} as TimerState),
+                    curState: toTimerState(result),
                     needReload: false,
                 });
             }
@@ -136,7 +167,7 @@ export const useWorklogStore = create<WorklogState>((set, get) => ({
 
         set({
             timerEntry: entry,
-            curState: getElapseState(entry) || ({} as TimerState),
+            curState: toTimerState(entry),
             needReload: false,
         });
     },
@@ -148,7 +179,7 @@ export const useWorklogStore = create<WorklogState>((set, get) => ({
 
         set({
             timerEntry: entry,
-            curState: getElapseState(entry) || ({} as TimerState),
+            curState: toTimerState(entry),
             needReload: false,
         });
     },
@@ -160,7 +191,7 @@ export const useWorklogStore = create<WorklogState>((set, get) => ({
 
         set({
             timerEntry: entry,
-            curState: getElapseState(entry) || ({} as TimerState),
+            curState: toTimerState(entry),
             needReload: true,
         });
     },
@@ -172,7 +203,7 @@ export const useWorklogStore = create<WorklogState>((set, get) => ({
 
         set({
             timerEntry: entry,
-            curState: getElapseState(entry) || ({} as TimerState),
+            curState: toTimerState(entry),
             needReload: false,
         });
     },
