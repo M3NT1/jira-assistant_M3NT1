@@ -8,6 +8,13 @@ export interface GadgetInfo {
 
 export const gadgetList: GadgetInfo[] = [
     {
+        id: 'meetingReconcile',
+        icon: 'fa-users',
+        name: 'Unlogged Meetings',
+        details:
+            "Today's calendar meetings that have no worklog yet, each with a one-click log button. Requires a Google or Outlook calendar integration.",
+    },
+    {
         id: 'myOpenTickets',
         icon: 'fa-eye',
         name: 'My Open Tickets',
