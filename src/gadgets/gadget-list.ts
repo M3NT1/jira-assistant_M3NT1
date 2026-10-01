@@ -8,6 +8,13 @@ export interface GadgetInfo {
 
 export const gadgetList: GadgetInfo[] = [
     {
+        id: 'monthlyTrend',
+        icon: 'fa-th',
+        name: 'Logging Activity',
+        details:
+            'A calendar heatmap of the hours you logged each day, in the style of a contribution graph. Switch between the current month, the last 6 months, 1 year or 2 years, and see your longest logging streak and the work days you left empty.',
+    },
+    {
         id: 'myOpenTickets',
         icon: 'fa-eye',
         name: 'My Open Tickets',

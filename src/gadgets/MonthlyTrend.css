@@ -1,0 +1,110 @@
+/* Calendar heatmap of logged hours.
+   Sequential single-hue (blue) ramp, light -> dark on a light surface and inverted on a
+   dark surface, so intensity always grows away from the background. Deliberately not a
+   red/green scale: those two are the pair colour-blind readers lose first. */
+/* Steps validated against each surface (monotone lightness, >=0.06 L gaps, single hue,
+   lightest step clears 2:1 on its surface) — the lightest bin must stay distinguishable
+   from the empty bin, otherwise "nothing" and "barely anything" look the same. */
+.ja-heatmap {
+    --ja-heat-0: #e8e7e1;
+    --ja-heat-1: #86b6ef;
+    --ja-heat-2: #3987e5;
+    --ja-heat-3: #256abf;
+    --ja-heat-4: #0d366b;
+    --ja-heat-ring: rgb(11 11 11 / 12%);
+}
+
+body.mode-dark .ja-heatmap {
+    --ja-heat-0: #2c2c2a;
+    --ja-heat-1: #184f95;
+    --ja-heat-2: #2a78d6;
+    --ja-heat-3: #5598e7;
+    --ja-heat-4: #9ec5f4;
+    --ja-heat-ring: rgb(255 255 255 / 14%);
+}
+
+.ja-heat-cell {
+    border-radius: 2px;
+    transition: outline-color 0.1s ease;
+    outline: 2px solid transparent;
+    outline-offset: 1px;
+}
+
+/* Only the empty bin gets a hairline: separation between filled cells is the surface
+   gap, and a ring on every cell would add more ink than the data itself */
+.ja-heat-level-0 {
+    box-shadow: inset 0 0 0 1px var(--ja-heat-ring);
+}
+
+.ja-heat-cell:hover,
+.ja-heat-cell:focus-visible {
+    outline-color: var(--ja-heat-4);
+}
+
+/* Non-working days read as "nothing expected" rather than "nothing logged" */
+.ja-heat-cell.ja-heat-off {
+    opacity: 0.45;
+}
+
+.ja-heat-level-0 {
+    background-color: var(--ja-heat-0);
+}
+.ja-heat-level-1 {
+    background-color: var(--ja-heat-1);
+}
+.ja-heat-level-2 {
+    background-color: var(--ja-heat-2);
+}
+.ja-heat-level-3 {
+    background-color: var(--ja-heat-3);
+}
+.ja-heat-level-4 {
+    background-color: var(--ja-heat-4);
+}
+
+.ja-heat-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 4px;
+}
+
+/* Cross-highlighting: pointing at a stat card outlines the days it counted and pushes
+   the rest back. The outline is ink, not another data colour, so it cannot be mistaken
+   for a value on the scale. */
+.ja-heat-cell.ja-heat-mark {
+    outline: 2px solid var(--text-primary);
+    outline-offset: 1px;
+    z-index: 1;
+}
+
+.ja-heat-cell.ja-heat-dim {
+    opacity: 0.18;
+}
+
+.ja-heat-cell.ja-heat-off.ja-heat-dim {
+    opacity: 0.1;
+}
+
+/* Cards that can drive the highlight advertise it on hover */
+.ja-heat-card {
+    cursor: help;
+    transition: box-shadow 0.1s ease;
+}
+
+.ja-heat-card:hover,
+.ja-heat-card:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--ja-heat-3);
+    outline: none;
+}
+
+.ja-heat-card-active {
+    box-shadow: inset 0 0 0 2px var(--ja-heat-3);
+}
+
+/* Month calendar view: bigger cells that can carry the value directly, so the
+   colour is not the only channel */
+.ja-heat-month-cell {
+    border-radius: 4px;
+    box-shadow: inset 0 0 0 1px var(--ja-heat-ring);
+    min-height: 42px;
+}
