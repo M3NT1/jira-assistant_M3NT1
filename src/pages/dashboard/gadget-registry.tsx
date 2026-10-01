@@ -12,6 +12,7 @@ import {
     TicketWiseWorklog,
     WorklogBarChartGadget,
     WorklogReport,
+    WorklogTimerGadget,
 } from '../../gadgets';
 
 interface GadgetComponentInfo {
@@ -33,6 +34,8 @@ export function getGadgetComponent(gadgetName: string, opts: string[] = []): Gad
         worklogBarChart: () => ({ Component: WorklogBarChartGadget, props: { title: GadgetTitle.WorklogBarChart } }),
         sWiseTSpent: () => ({ Component: StatusWiseTimeSpent, props: { title: GadgetTitle.StatusWiseTimeSpent } }),
         teamWorklogReport: () => ({ Component: WorklogReport, props: { title: GadgetTitle.WorklogReport } }),
+
+        worklogTimer: () => ({ Component: WorklogTimerGadget, props: { title: GadgetTitle.WorklogTimer } }),
 
         agendaDay: () => ({
             Component: CalendarGadget,

@@ -8,6 +8,13 @@ export interface GadgetInfo {
 
 export const gadgetList: GadgetInfo[] = [
     {
+        id: 'worklogTimer',
+        icon: 'fa-play-circle',
+        name: 'Worklog Timer',
+        details:
+            'Shows the running time tracker with pause, resume and stop controls, and lets you start tracking on any recently viewed or assigned ticket with one click.',
+    },
+    {
         id: 'myOpenTickets',
         icon: 'fa-eye',
         name: 'My Open Tickets',
