@@ -1,12 +1,30 @@
+import { useContext } from 'react';
+
+import { createPortal } from 'react-dom';
+
 import type { EntryRenderContext, ResolvedCalendarEntry } from 'fluxo-ui';
+import { CalendarContext } from 'fluxo-ui';
 
 import { useService } from '@/services/injector';
 
 import type { Meeting, Worklog } from '@types';
 
-import { getEntryTimeFormat, getEventDuration, isDayGridView, isListView, isTimeGridView } from './calendar-utils';
+import { getDragPreviewRange, getEntryTimeFormat, getEventDuration, isDayGridView, isListView, isTimeGridView } from './calendar-utils';
 import type { CalendarEntryData, CalendarEvent, CalendarSettings } from './types';
 import WorklogOptions from './WorklogOptions';
+
+/** Keeps the drag label beside the pointer, flipping it to the other side near the window edges */
+function getDragLabelStyle(x: number, y: number): React.CSSProperties {
+    const gap = 16;
+    const flipX = x > window.innerWidth - 240;
+    const flipY = y > window.innerHeight - 48;
+
+    return {
+        left: flipX ? x - gap : x + gap,
+        top: flipY ? y - gap : y + gap,
+        transform: `translate(${flipX ? '-100%' : '0'}, ${flipY ? '-100%' : '0'})`,
+    };
+}
 
 interface CalendarEventContentProps {
     entry: ResolvedCalendarEntry;
@@ -37,10 +55,16 @@ export default function CalendarEventContent({
     const data = (entry.data || entry.originalEntry?.data) as unknown as CalendarEntryData;
     const { entryType, logged, diff, sourceObject } = data;
     const { $utils, $session } = useService('UtilsService', 'SessionService');
+    const calendar = useContext(CalendarContext);
 
-    const startTime = entry.start instanceof Date ? entry.start : new Date(entry.start);
-    const timeText = $utils.formatDate(startTime, getEntryTimeFormat($session.CurrentUser?.timeFormat));
-    const hourDiff = ` (${$utils.formatTs(getEventDuration(entry as any))})`;
+    // While a worklog is dragged it shows where the drop will put it, not where it was
+    const dragState = entryType === 1 && calendar?.dragState?.entryId === entry.id ? calendar.dragState : null;
+    const range = dragState && calendar ? getDragPreviewRange(dragState, calendar.config.snapDuration) : entry;
+
+    const timeFormat = getEntryTimeFormat($session.CurrentUser?.timeFormat);
+    const startTime = range.start instanceof Date ? range.start : new Date(range.start);
+    const timeText = $utils.formatDate(startTime, timeFormat);
+    const hourDiff = ` (${$utils.formatTs(getEventDuration(range as any))})`;
 
     if (entryType === 3) {
         const timeSpent = $utils.formatSecs(logged!);
@@ -52,6 +76,7 @@ export default function CalendarEventContent({
     let evTitle = entry.title;
     let subTitle = '';
     let title = '';
+    let timeRangeText = '';
 
     if (entryType === 1) {
         const wl = srcObj as Worklog;
@@ -63,7 +88,9 @@ export default function CalendarEventContent({
             subTitle = wl.summary || '';
         }
 
-        title = `${timeText} ${hourDiff}\n${evTitle}`;
+        const endTime = range.end instanceof Date ? range.end : new Date(range.end);
+        timeRangeText = `${timeText} - ${$utils.formatDate(endTime, timeFormat)}${hourDiff}`;
+        title = `${timeRangeText}\n${evTitle}`;
     }
 
     const isLoading = loadingEventIds?.has(String(entry.id));
@@ -134,6 +161,13 @@ export default function CalendarEventContent({
                         {subTitle}
                     </div>
                 )}
+                {dragState &&
+                    createPortal(
+                        <div className="cal-drag-time" style={getDragLabelStyle(dragState.currentX, dragState.currentY)}>
+                            {timeRangeText}
+                        </div>,
+                        document.body,
+                    )}
             </div>
         );
     }

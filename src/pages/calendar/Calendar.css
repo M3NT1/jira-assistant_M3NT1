@@ -224,3 +224,20 @@
 .cal-view-dropdown {
     width: 120px;
 }
+
+/* Where a dragged worklog will land, shown beside the pointer; styled like the app's tooltips */
+.cal-drag-time {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    user-select: none;
+    white-space: nowrap;
+    padding: 0.375rem 0.5rem;
+    border-radius: var(--eui-radius-sm, 0.25rem);
+    box-shadow: var(--eui-shadow, 0 4px 16px 0 rgba(0, 0, 0, 0.12));
+    background-color: #1f2937;
+    color: #f9fafb;
+    font-size: 0.75rem;
+    /* Steady width while the digits change under the pointer */
+    font-variant-numeric: tabular-nums;
+}

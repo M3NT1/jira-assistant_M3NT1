@@ -81,6 +81,43 @@ export function getResizedWorklogRange(start: Date, end: Date, edge: 'top' | 'bo
     return range.end.getTime() > range.start.getTime() ? range : null;
 }
 
+/** The parts of the calendar's drag state needed to work out where a drag would land */
+interface WorklogDrag {
+    type: 'move' | 'resize';
+    edge?: 'top' | 'bottom';
+    offsetMinutes: number;
+    dayOffset: number;
+    originalStart: Date;
+    originalEnd: Date;
+}
+
+/**
+ * The range a worklog would be saved with if the drag in progress were dropped now.
+ * Applies the same offsets the time grid reports on drop and the same rules the drop
+ * handlers save with, so the preview never shows a time the save would round differently.
+ */
+export function getDragPreviewRange(drag: WorklogDrag, gridMinutes: number): TimeRange {
+    const { type, edge = 'bottom', offsetMinutes, dayOffset, originalStart, originalEnd } = drag;
+    const original = { start: originalStart, end: originalEnd };
+
+    // The calendar ignores a drop that has not moved a full slot yet
+    if (offsetMinutes === 0 && (type === 'resize' || dayOffset === 0)) {
+        return original;
+    }
+
+    const offsetMs = offsetMinutes * 60000;
+
+    if (type === 'move') {
+        // Moving snaps the new start to the grid and keeps the duration
+        const start = snapTimeToGrid(gridMinutes, new Date(originalStart.getTime() + offsetMs + dayOffset * 24 * 60 * 60 * 1000));
+        return { start, end: new Date(start.getTime() + originalEnd.getTime() - originalStart.getTime()) };
+    }
+
+    const start = edge === 'top' ? new Date(originalStart.getTime() + offsetMs) : originalStart;
+    const end = edge === 'bottom' ? new Date(originalEnd.getTime() + offsetMs) : originalEnd;
+    return getResizedWorklogRange(start, end, edge, gridMinutes) || original;
+}
+
 export function getEventDuration(entry: CalendarEvent): string {
     const start = entry.start instanceof Date ? entry.start : new Date(entry.start);
     const end = entry.end instanceof Date ? entry.end : new Date(entry.end);
