@@ -8,6 +8,13 @@ export interface GadgetInfo {
 
 export const gadgetList: GadgetInfo[] = [
     {
+        id: 'quickWorklog',
+        icon: 'fa-bolt',
+        name: 'Quick Log',
+        details:
+            'A compact form to log time without opening a dialog. Pick a ticket, type the duration and press Enter. Recently logged and bookmarked tickets are offered as one-click shortcuts.',
+    },
+    {
         id: 'myOpenTickets',
         icon: 'fa-eye',
         name: 'My Open Tickets',
