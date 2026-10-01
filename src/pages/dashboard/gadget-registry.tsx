@@ -4,6 +4,7 @@ import {
     BaseGadgetUnavailable,
     CalendarGadget,
     DateWiseWorklog,
+    EstimateVsActual,
     MyBookmarks,
     MyOpenTickets,
     MyReports,
@@ -33,6 +34,8 @@ export function getGadgetComponent(gadgetName: string, opts: string[] = []): Gad
         worklogBarChart: () => ({ Component: WorklogBarChartGadget, props: { title: GadgetTitle.WorklogBarChart } }),
         sWiseTSpent: () => ({ Component: StatusWiseTimeSpent, props: { title: GadgetTitle.StatusWiseTimeSpent } }),
         teamWorklogReport: () => ({ Component: WorklogReport, props: { title: GadgetTitle.WorklogReport } }),
+
+        estimateVsActual: () => ({ Component: EstimateVsActual, props: { title: GadgetTitle.EstimateVsActual } }),
 
         agendaDay: () => ({
             Component: CalendarGadget,

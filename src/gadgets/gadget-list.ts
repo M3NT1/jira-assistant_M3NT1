@@ -8,6 +8,13 @@ export interface GadgetInfo {
 
 export const gadgetList: GadgetInfo[] = [
     {
+        id: 'estimateVsActual',
+        icon: 'fa-balance-scale',
+        name: 'Estimate vs Actual',
+        details:
+            'Original estimate against time actually spent for your unresolved tickets, flagging the ones that have run over. Aggregate values include sub-task time.',
+    },
+    {
         id: 'myOpenTickets',
         icon: 'fa-eye',
         name: 'My Open Tickets',
