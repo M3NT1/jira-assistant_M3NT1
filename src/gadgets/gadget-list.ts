@@ -8,6 +8,13 @@ export interface GadgetInfo {
 
 export const gadgetList: GadgetInfo[] = [
     {
+        id: 'recentJiraUpdates',
+        icon: 'fa-bell-o',
+        name: 'Recent Jira Updates',
+        details:
+            'Two views of recent change history. "My activity" lists the tickets you administered on each day and whether you booked time on them, so forgotten worklogs stand out. "Others\' changes" shows what everyone else changed on your tickets.',
+    },
+    {
         id: 'myOpenTickets',
         icon: 'fa-eye',
         name: 'My Open Tickets',

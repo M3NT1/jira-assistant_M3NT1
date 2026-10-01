@@ -6,6 +6,24 @@ import type JiraService from './jira-service';
 import type SessionService from './session-service';
 import type UserUtilsService from './userutils-service';
 
+export interface RecentUpdatesOptions {
+    /** List the current user's own changes instead of everyone else's */
+    mine?: boolean;
+    maxResults?: number;
+}
+
+/**
+ * Tickets the current user is likely to administer. Server / DC has no JQL operator for
+ * "changed by me", so involvement is approximated and the change author is then matched
+ * against the change log itself.
+ */
+const MY_ACTIVITY_JQL =
+    '(assignee = currentUser() OR reporter = currentUser() OR watcher = currentUser()) AND updatedDate >= $date$ ORDER BY updated DESC';
+
+/** Used when the instance rejects the watcher clause (watching disabled) */
+const MY_ACTIVITY_JQL_NO_WATCHER =
+    '(assignee = currentUser() OR reporter = currentUser()) AND updatedDate >= $date$ ORDER BY updated DESC';
+
 export default class JiraUpdatesService {
     static dependencies = ['JiraService', 'UserUtilsService', 'SessionService'];
 
@@ -19,7 +37,9 @@ export default class JiraUpdatesService {
         this.$session = $session;
     }
 
-    async getRescentUpdates(from: number | string | Date = 7): Promise<any> {
+    async getRescentUpdates(from: number | string | Date = 7, options?: RecentUpdatesOptions): Promise<any> {
+        const mine = options?.mine === true;
+
         if (!from) {
             from = '-3d';
         }
@@ -34,19 +54,44 @@ export default class JiraUpdatesService {
             from = `-${from}d`;
         }
 
-        const jql = (this.$session?.CurrentUser?.jiraUpdatesJQL || defaultSettings.jiraUpdatesJQL).replace(/\$date\$/g, from as string);
+        // The configured "Jira updates" JQL is built around lastViewed ("what have I not seen"),
+        // which is the wrong lens for reviewing your own activity — you have obviously seen it.
+        const jqlTemplate = mine
+            ? MY_ACTIVITY_JQL
+            : this.$session?.CurrentUser?.jiraUpdatesJQL || defaultSettings.jiraUpdatesJQL;
+        const jql = jqlTemplate.replace(/\$date\$/g, from as string);
 
-        const maxResults = 15;
-        const issues = await this.$jira.searchTickets(
-            jql,
-            ['key', 'lastViewed', 'updated', 'changeLog', 'summary', 'assignee', 'reporter', 'comments'],
-            undefined,
-            { expand: ['changelog'], maxResults },
-        );
+        const maxResults = options?.maxResults || (mine ? 100 : 15);
+        const searchFields = ['key', 'lastViewed', 'updated', 'changeLog', 'summary', 'assignee', 'reporter', 'comments'];
+
+        let issues: any[];
+        try {
+            issues = await this.$jira.searchTickets(jql, searchFields, undefined, {
+                expand: ['changelog'],
+                maxResults,
+                ignoreWarnings: mine,
+                ignoreErrors: mine,
+            });
+        } catch (err) {
+            // Watching can be switched off instance-wide, which makes "watcher" an invalid JQL
+            // field; fall back to assignee / reporter only rather than failing the whole view
+            if (!mine) {
+                throw err;
+            }
+
+            console.warn('My-activity search failed. Retrying without the watcher clause.', err);
+            const fallbackJql = MY_ACTIVITY_JQL_NO_WATCHER.replace(/\$date\$/g, from as string);
+            issues = await this.$jira.searchTickets(fallbackJql, searchFields, undefined, {
+                expand: ['changelog'],
+                maxResults,
+                ignoreWarnings: true,
+            });
+        }
 
         const updatedIssues = issues
             .filter((i: any) => {
                 if (!i.changelog?.histories) return false;
+                if (mine) return true;
                 if (!i.fields?.lastViewed) return true;
                 const updatedDate = new Date(i.fields?.updated);
                 const lastViewedDate = new Date(i.fields?.lastViewed);
@@ -68,12 +113,10 @@ export default class JiraUpdatesService {
         }, {});
 
         // Match on the Jira user name rather than the e-mail address: Server / DC hides
-        // emailAddress under its privacy settings, which makes every author comparison fail
-        const notifications = this.extractUpdates(
-            updatedIssues,
-            (getUserName(this.$session.CurrentUser?.jiraUser || {}, true) || '').toLowerCase(),
-            fieldNames,
-        );
+        // emailAddress under its privacy settings, which would make every author comparison fail
+        const currentUserName = (getUserName(this.$session.CurrentUser?.jiraUser || {}, true) || '').toLowerCase();
+
+        const notifications = this.extractUpdates(updatedIssues, currentUserName, fieldNames, { mine });
 
         const groupedByKey: { [key: string]: any[] } = {};
         notifications.forEach((n: any) => {
@@ -93,8 +136,9 @@ export default class JiraUpdatesService {
         return { list, total: notifications.length, ticketCount: list.length };
     }
 
-    extractUpdates(issues: any[], currentUserName: string, fieldNames: any): any[] {
+    extractUpdates(issues: any[], currentUserName: string, fieldNames: any, options?: { mine?: boolean }): any[] {
         const result: any[] = [];
+        const mine = options?.mine === true;
         const isCurrentUser = (user: any) => !!currentUserName && getUserName(user || {}, true) === currentUserName;
 
         issues.forEach(({ key, summary, assignee, reporter, lastViewed, histories, comments }: any) => {
@@ -108,7 +152,14 @@ export default class JiraUpdatesService {
             if (histories?.length) {
                 histories.forEach(({ author, created, items }: any) => {
                     const createdDate = created && new Date(created);
-                    if (!isCurrentUser(author) && (!createdDate || !lastViewed || createdDate > new Date(lastViewed))) {
+                    const authorMatches = isCurrentUser(author);
+
+                    // "mine" keeps only my own changes; the default view keeps everyone else's
+                    // and additionally hides anything already seen
+                    if (
+                        (mine ? authorMatches : !authorMatches) &&
+                        (mine || !createdDate || !lastViewed || createdDate > new Date(lastViewed))
+                    ) {
                         const date = createdDate;
                         const sortBy = date.getTime();
                         items.forEach(({ field, fieldId, fromString, toString }: any) => {

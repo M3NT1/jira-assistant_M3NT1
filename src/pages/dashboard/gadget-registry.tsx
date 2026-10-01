@@ -8,6 +8,7 @@ import {
     MyOpenTickets,
     MyReports,
     PendingWorklog,
+    RecentJiraUpdates,
     StatusWiseTimeSpent,
     TicketWiseWorklog,
     WorklogBarChartGadget,
@@ -33,6 +34,8 @@ export function getGadgetComponent(gadgetName: string, opts: string[] = []): Gad
         worklogBarChart: () => ({ Component: WorklogBarChartGadget, props: { title: GadgetTitle.WorklogBarChart } }),
         sWiseTSpent: () => ({ Component: StatusWiseTimeSpent, props: { title: GadgetTitle.StatusWiseTimeSpent } }),
         teamWorklogReport: () => ({ Component: WorklogReport, props: { title: GadgetTitle.WorklogReport } }),
+
+        recentJiraUpdates: () => ({ Component: RecentJiraUpdates, props: { title: GadgetTitle.RecentJiraUpdates } }),
 
         agendaDay: () => ({
             Component: CalendarGadget,
