@@ -8,6 +8,13 @@ export interface GadgetInfo {
 
 export const gadgetList: GadgetInfo[] = [
     {
+        id: 'weeklyTrend',
+        icon: 'fa-line-chart',
+        name: 'Weekly Trend',
+        details:
+            'This week versus last week and your four-week average, broken down per day, with your expected hours drawn as a reference line.',
+    },
+    {
         id: 'myOpenTickets',
         icon: 'fa-eye',
         name: 'My Open Tickets',

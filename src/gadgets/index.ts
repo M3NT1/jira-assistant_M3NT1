@@ -7,5 +7,6 @@ export { default as MyReports } from './MyReports';
 export { default as PendingWorklog } from './PendingWorklog';
 export { default as StatusWiseTimeSpent } from './StatusWiseTimeSpent';
 export { default as TicketWiseWorklog } from './TicketWiseWorklog';
+export { default as WeeklyTrend } from './WeeklyTrend';
 export { default as WorklogBarChartGadget } from './WorklogBarChartGadget';
 export { WorklogReport } from './WorklogReport';
