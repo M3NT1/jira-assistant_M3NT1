@@ -8,6 +8,13 @@ export interface GadgetInfo {
 
 export const gadgetList: GadgetInfo[] = [
     {
+        id: 'loggingCompliance',
+        icon: 'fa-calendar-check-o',
+        name: 'Logging Compliance',
+        details:
+            'A calendar grid highlighting days where you logged less than expected, with the total shortfall for the period. Weekends, holidays and leave are excluded. Click any day to log time on it.',
+    },
+    {
         id: 'myOpenTickets',
         icon: 'fa-eye',
         name: 'My Open Tickets',

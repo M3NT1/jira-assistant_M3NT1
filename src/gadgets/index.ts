@@ -1,6 +1,7 @@
 export { BaseGadgetUnavailable } from './BaseGadget';
 export { CalendarGadget } from './CalendarGadget';
 export { default as DateWiseWorklog } from './DateWiseWorklog';
+export { default as LoggingCompliance } from './LoggingCompliance';
 export { default as MyBookmarks } from './MyBookmarks';
 export { default as MyOpenTickets } from './MyOpenTickets';
 export { default as MyReports } from './MyReports';
