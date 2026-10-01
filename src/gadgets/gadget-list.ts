@@ -8,6 +8,13 @@ export interface GadgetInfo {
 
 export const gadgetList: GadgetInfo[] = [
     {
+        id: 'timeDistribution',
+        icon: 'fa-pie-chart',
+        name: 'Time Distribution',
+        details:
+            'Where your time went over a period, grouped by project, epic or parent, issue type, status or priority. Useful for reporting and for spotting unplanned work.',
+    },
+    {
         id: 'myOpenTickets',
         icon: 'fa-eye',
         name: 'My Open Tickets',
