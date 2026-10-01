@@ -8,6 +8,13 @@ export interface GadgetInfo {
 
 export const gadgetList: GadgetInfo[] = [
     {
+        id: 'staleTickets',
+        icon: 'fa-hourglass-half',
+        name: 'Stale Tickets',
+        details:
+            'Your unresolved tickets with no activity for a configurable number of days, so forgotten work surfaces before the next standup.',
+    },
+    {
         id: 'myOpenTickets',
         icon: 'fa-eye',
         name: 'My Open Tickets',
