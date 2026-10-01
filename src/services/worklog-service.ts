@@ -415,7 +415,8 @@ export default class WorklogService {
         }
     }
 
-    async changeWorklogTS(worklog: any, timeSpent: string): Promise<WorklogCalendarEntry> {
+    /** Changes the duration, and the start as well when given, saving both in a single upload */
+    async changeWorklogTS(worklog: any, timeSpent: string, startDate?: Date): Promise<WorklogCalendarEntry> {
         let wl: any;
 
         if (!isNaN(Number(worklog.id)) && worklog.id !== DummyWLId) {
@@ -426,6 +427,10 @@ export default class WorklogService {
 
         wl.timeSpent = timeSpent;
         delete wl.overrideTimeSpent;
+
+        if (startDate) {
+            wl.dateStarted = new Date(startDate);
+        }
 
         const getCalEntry = () => this.getWLCalendarEntry(wl);
 

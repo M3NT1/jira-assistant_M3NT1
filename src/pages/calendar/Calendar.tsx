@@ -298,7 +298,7 @@ export default function Calendar({
                     ...entry,
                     data,
                 } as CalendarEvent;
-                await handleWorklogResize(calEvent, info.newStart, info.newEnd, zoomIn);
+                await handleWorklogResize(calEvent, info.newStart, info.newEnd, info.edge, zoomIn);
                 onWorklogChange?.(GadgetActionType.WorklogModified);
             }
         },

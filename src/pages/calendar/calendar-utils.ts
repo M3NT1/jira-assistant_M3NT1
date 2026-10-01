@@ -67,6 +67,20 @@ export function snapTimeToGrid(gridMinutes: number, date: Date): Date {
     return newDate;
 }
 
+interface TimeRange {
+    start: Date;
+    end: Date;
+}
+
+/**
+ * A resized worklog: only the dragged edge moves, and it snaps to the grid.
+ * Null when the edge was dragged onto or past the other one, which leaves no time to log.
+ */
+export function getResizedWorklogRange(start: Date, end: Date, edge: 'top' | 'bottom', gridMinutes: number): TimeRange | null {
+    const range = edge === 'top' ? { start: snapTimeToGrid(gridMinutes, start), end } : { start, end: snapTimeToGrid(gridMinutes, end) };
+    return range.end.getTime() > range.start.getTime() ? range : null;
+}
+
 export function getEventDuration(entry: CalendarEvent): string {
     const start = entry.start instanceof Date ? entry.start : new Date(entry.start);
     const end = entry.end instanceof Date ? entry.end : new Date(entry.end);

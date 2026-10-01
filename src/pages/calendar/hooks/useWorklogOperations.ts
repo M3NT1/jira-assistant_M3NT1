@@ -6,7 +6,7 @@ import { useService } from '@/services/injector';
 
 import type { Worklog, WorklogCalendarEntry } from '@types';
 
-import { createInfoEvent, createWorklogEvent, snapTimeToGrid } from '../calendar-utils';
+import { createInfoEvent, createWorklogEvent, formatTimeSpent, getResizedWorklogRange, snapTimeToGrid } from '../calendar-utils';
 import type { CalendarEvent } from '../types';
 
 type SetEvents = React.Dispatch<React.SetStateAction<CalendarEvent[]>>;
@@ -70,11 +70,13 @@ export function useWorklogOperations(setEvents: SetEvents, settings: any, curren
         ) => {
             const worklog = entry.data.sourceObject as Worklog;
             const entryId = entry.id as string;
+            // A copy lands on the grid just like a move does
+            const newTime = snapTimeToGrid(zoomIn ? 5 : 15, newStart);
             addLoadingEvent(entryId);
 
             if (isCopy) {
                 try {
-                    const newEntry = await $worklog.copyWorklog(worklog, newStart);
+                    const newEntry = await $worklog.copyWorklog(worklog, newTime);
                     const newEvent = createWorklogEvent(newEntry, settings);
                     setEvents((prev) => {
                         let updated = [...prev, newEvent];
@@ -94,7 +96,6 @@ export function useWorklogOperations(setEvents: SetEvents, settings: any, curren
                 }
             } else {
                 const oldDate = new Date(worklog.dateStarted);
-                const newTime = snapTimeToGrid(zoomIn ? 5 : 15, newStart);
                 const durationMs = new Date(entry.end).getTime() - new Date(entry.start).getTime();
 
                 const optimisticEntry = buildWorklogCalendarEntry(entry, worklog, newTime, durationMs);
@@ -140,19 +141,21 @@ export function useWorklogOperations(setEvents: SetEvents, settings: any, curren
     );
 
     const handleWorklogResize = useCallback(
-        async (entry: CalendarEvent, newStart: Date, newEnd: Date, zoomIn: boolean) => {
+        async (entry: CalendarEvent, newStart: Date, newEnd: Date, edge: 'top' | 'bottom', zoomIn: boolean) => {
             const worklog = entry.data.sourceObject as Worklog;
-            const snappedEnd = snapTimeToGrid(zoomIn ? 5 : 15, newEnd);
-            const diff = (snappedEnd.getTime() - newStart.getTime()) / 1000;
-            const hours = Math.floor(diff / 3600);
-            const minutes = Math.floor((diff % 3600) / 60);
-            const timeSpent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+            const range = getResizedWorklogRange(newStart, newEnd, edge, zoomIn ? 5 : 15);
+            if (!range) {
+                // An edge dragged onto the other one leaves nothing to log, so keep the worklog as it was
+                return;
+            }
+
+            const startDate = new Date(range.start);
+            const newDurationMs = range.end.getTime() - startDate.getTime();
+            const timeSpent = formatTimeSpent(newDurationMs / 1000);
 
             const entryId = entry.id as string;
             addLoadingEvent(entryId);
 
-            const startDate = new Date(newStart);
-            const newDurationMs = snappedEnd.getTime() - startDate.getTime();
             const optimisticEntry = buildWorklogCalendarEntry(entry, worklog, startDate, newDurationMs);
             const optimisticEvent = createWorklogEvent(optimisticEntry, settings);
 
@@ -163,7 +166,8 @@ export function useWorklogOperations(setEvents: SetEvents, settings: any, curren
             });
 
             try {
-                const updatedEntry = await $worklog.changeWorklogTS(worklog, timeSpent);
+                // Resizing from the top edge moves the start, so it is saved together with the new duration
+                const updatedEntry = await $worklog.changeWorklogTS(worklog, timeSpent, edge === 'top' ? startDate : undefined);
                 const updatedEvent = createWorklogEvent(updatedEntry, settings);
 
                 setEvents((prev) => {
