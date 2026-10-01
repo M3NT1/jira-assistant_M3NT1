@@ -6,7 +6,15 @@
  * expose stored credentials in readable form. Values encrypted here are prefixed
  * with "enc1:"; anything without that prefix is treated as a legacy base64
  * (btoa) credential and decoded accordingly, which keeps old integrations working.
+ *
+ * The desktop app is the exception: it has always encrypted credentials through its
+ * native encryptData / decryptData service, and keeps doing so. Its stored values carry
+ * no prefix, so reading them as legacy base64 would break every existing app login.
  */
+
+import { isAppBuild } from '../constants/build-info';
+
+import { executeService } from './proxy';
 
 const ENCRYPTED_PREFIX = 'enc1:';
 const KEY_DB_NAME = 'ja-crypto';
@@ -94,10 +102,18 @@ function fromBase64(value: string): Uint8Array {
 }
 
 export function isEncryptedCredential(value: string | undefined | null): boolean {
+    // Desktop app values are natively encrypted and never need upgrading
+    if (isAppBuild) {
+        return !!value;
+    }
     return !!value?.startsWith(ENCRYPTED_PREFIX);
 }
 
 export async function encryptText(plainText: string): Promise<string> {
+    if (isAppBuild) {
+        return executeService('SELF', 'encryptData', [plainText]);
+    }
+
     const key = await getKey();
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plainText));
@@ -105,6 +121,10 @@ export async function encryptText(plainText: string): Promise<string> {
 }
 
 export async function decryptText(storedValue: string): Promise<string> {
+    if (isAppBuild) {
+        return executeService('SELF', 'decryptData', [storedValue]);
+    }
+
     if (!isEncryptedCredential(storedValue)) {
         // Legacy value stored with plain base64 encoding
         return atob(storedValue);
