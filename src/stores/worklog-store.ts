@@ -87,6 +87,17 @@ function toTimerState(entry: WorklogTimer | null): TimerState {
     return state || ({} as TimerState);
 }
 
+/**
+ * The timer as it is stored right now. Stop answers `true` once the timer became a worklog,
+ * and pause / resume answer `false` when the stored timer was already in that state (changed
+ * from another tab or by the lock-screen auto-pause). Neither reply is a timer entry, so the
+ * store reads the real state back instead of keeping the reply as the timer.
+ */
+async function readStoredTimer(): Promise<WorklogTimer | null> {
+    const { $wltimer } = inject('WorklogTimerService');
+    return ((await $wltimer.getCurrentTimer()) as WorklogTimer | undefined) || null;
+}
+
 export function getDispTime(lapse: number) {
     const h = String(Math.floor(lapse / 3600)).padStart(2, '0');
     const m = String(Math.floor((lapse % 3600) / 60)).padStart(2, '0');
@@ -163,7 +174,7 @@ export const useWorklogStore = create<WorklogState>((set, get) => ({
     resumeTimer: async () => {
         const { $wltimer } = inject('WorklogTimerService');
         const result = (await $wltimer.resumeTimer()) as WorklogTimer | false;
-        const entry = result || null;
+        const entry = result || (await readStoredTimer());
 
         set({
             timerEntry: entry,
@@ -173,9 +184,16 @@ export const useWorklogStore = create<WorklogState>((set, get) => ({
     },
 
     pauseTimer: async () => {
-        const { $wltimer } = inject('WorklogTimerService');
-        const result = (await $wltimer.pauseTimer()) as WorklogTimer | false;
-        const entry = result || null;
+        const { $wltimer, $message } = inject('WorklogTimerService', 'MessageService');
+        let result: WorklogTimer | false = false;
+
+        try {
+            result = (await $wltimer.pauseTimer()) as WorklogTimer | false;
+        } catch (err: any) {
+            $message.error(err.message);
+        }
+
+        const entry = result || (await readStoredTimer());
 
         set({
             timerEntry: entry,
@@ -185,9 +203,15 @@ export const useWorklogStore = create<WorklogState>((set, get) => ({
     },
 
     stopTimer: async () => {
-        const { $wltimer } = inject('WorklogTimerService');
-        const result = (await $wltimer.stopTimer()) as WorklogTimer | undefined;
-        const entry = result || null;
+        const { $wltimer, $message } = inject('WorklogTimerService', 'MessageService');
+
+        try {
+            await $wltimer.stopTimer();
+        } catch (err: any) {
+            $message.error(err.message);
+        }
+
+        const entry = await readStoredTimer();
 
         set({
             timerEntry: entry,

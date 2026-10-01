@@ -17,8 +17,11 @@ import type {
 import { Calendar as FluxoCalendar } from 'fluxo-ui';
 
 import { useService } from '@/services/injector';
+import { useWorklogStore } from '@/stores/worklog-store';
 
 import type { Meeting, Worklog } from '@types';
+
+import { ChangeTracker } from '@components';
 
 import { GadgetActionType, type GadgetActionTypeValue } from '@constants';
 
@@ -84,6 +87,17 @@ export default function Calendar({
     );
 
     const { events, setEvents, isLoading, fetchEvents } = useCalendarData(settings, currentUser);
+
+    // Stopping a timer - from the header, a bookmark or a ticket menu - saves its worklog
+    // outside the calendar, so reload the visible range then, as the worklog gadgets do
+    const timerKey = useWorklogStore((s) => s.timerEntry?.key);
+    const needReload = useWorklogStore((s) => s.needReload);
+    const reloadVisibleRange = useCallback(() => {
+        const range = dateRangeRef.current;
+        if (range) {
+            fetchEvents(range.start, range.end);
+        }
+    }, [fetchEvents]);
 
     const {
         loadingEventIds,
@@ -504,6 +518,7 @@ export default function Calendar({
 
     return (
         <div className={calendarClasses}>
+            <ChangeTracker key={timerKey} enabled={needReload} onChange={reloadVisibleRange} />
             {useEmbeddedHeader && headerSlotEl && createPortal(embeddedToolbar, headerSlotEl)}
             <div className="calendar-container flex-1">
                 <FluxoCalendar
