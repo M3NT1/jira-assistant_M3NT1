@@ -8,6 +8,13 @@ export interface GadgetInfo {
 
 export const gadgetList: GadgetInfo[] = [
     {
+        id: 'untrackedActivity',
+        icon: 'fa-search',
+        name: 'Untracked Activity',
+        details:
+            'Compares your Jira change history (status moves, comments, assignments) against your worklogs and lists tickets you worked on but never logged time for. Ideal for a Friday review.',
+    },
+    {
         id: 'myOpenTickets',
         icon: 'fa-eye',
         name: 'My Open Tickets',

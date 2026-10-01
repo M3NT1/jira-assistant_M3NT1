@@ -10,6 +10,7 @@ import {
     PendingWorklog,
     StatusWiseTimeSpent,
     TicketWiseWorklog,
+    UntrackedActivity,
     WorklogBarChartGadget,
     WorklogReport,
 } from '../../gadgets';
@@ -33,6 +34,8 @@ export function getGadgetComponent(gadgetName: string, opts: string[] = []): Gad
         worklogBarChart: () => ({ Component: WorklogBarChartGadget, props: { title: GadgetTitle.WorklogBarChart } }),
         sWiseTSpent: () => ({ Component: StatusWiseTimeSpent, props: { title: GadgetTitle.StatusWiseTimeSpent } }),
         teamWorklogReport: () => ({ Component: WorklogReport, props: { title: GadgetTitle.WorklogReport } }),
+
+        untrackedActivity: () => ({ Component: UntrackedActivity, props: { title: GadgetTitle.UntrackedActivity } }),
 
         agendaDay: () => ({
             Component: CalendarGadget,
