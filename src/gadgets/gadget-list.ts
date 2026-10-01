@@ -8,6 +8,13 @@ export interface GadgetInfo {
 
 export const gadgetList: GadgetInfo[] = [
     {
+        id: 'todaySummary',
+        icon: 'fa-sun-o',
+        name: 'Today',
+        details:
+            'A single view of your day: hours logged against your daily target, how much is still missing, entries waiting to be uploaded, the running timer and which tickets your time went to.',
+    },
+    {
         id: 'myOpenTickets',
         icon: 'fa-eye',
         name: 'My Open Tickets',
