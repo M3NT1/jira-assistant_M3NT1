@@ -118,10 +118,11 @@ export function useBaseGadget(props: BaseGadgetProps, config: BaseGadgetConfig) 
     );
 
     const getContextMenu = useCallback((): any[] => {
-        const gadgetActions: any[] = !isGadget
+        // In grid mode the size comes from the grid cell, so the width/height toggles
+        // would silently do nothing
+        const sizeActions: any[] = props.hostedChrome
             ? []
             : [
-                  { separator: true },
                   {
                       label: 'Full width',
                       icon: `fa fa-${fullWidth ? 'check-' : ''}circle`,
@@ -133,8 +134,11 @@ export function useBaseGadget(props: BaseGadgetProps, config: BaseGadgetConfig) 
                       command: () => setSizeOptions(fullWidth, !fullHeight),
                   },
                   { separator: true },
-                  { label: 'Remove', icon: 'fa fa-remove', command: removeGadget },
               ];
+
+        const gadgetActions: any[] = !isGadget
+            ? []
+            : [{ separator: true }, ...sizeActions, { label: 'Remove', icon: 'fa fa-remove', command: removeGadget }];
 
         const exportOpts: any[] = [];
         if (!config.hideExport) {
@@ -158,7 +162,18 @@ export function useBaseGadget(props: BaseGadgetProps, config: BaseGadgetConfig) 
             ...exportOpts,
             ...gadgetActions,
         ];
-    }, [isGadget, fullWidth, fullHeight, isFullScreen, config, setSizeOptions, removeGadget, toggleFullScreen, exportData]);
+    }, [
+        isGadget,
+        props.hostedChrome,
+        fullWidth,
+        fullHeight,
+        isFullScreen,
+        config,
+        setSizeOptions,
+        removeGadget,
+        toggleFullScreen,
+        exportData,
+    ]);
 
     const showGadgetContextMenu = useCallback(
         (e: React.MouseEvent) => {

@@ -32,6 +32,8 @@ export function GadgetContainer({
     loadingProgress,
     tabLayout,
     tabHeaderSlot,
+    hostedChrome,
+    hostHeaderSlot,
     draggableHandle,
     dropProps,
     isGadget: isGadgetProp,
@@ -120,10 +122,14 @@ export function GadgetContainer({
         }
     };
 
-    if (tabLayout) {
+    // Tab view and the resizable grid both supply their own frame and header, so the
+    // gadget contributes content only and its buttons are portalled into the host header
+    if (tabLayout || hostedChrome) {
+        const slot = hostedChrome ? hostHeaderSlot : tabHeaderSlot;
+
         return (
             <>
-                {tabHeaderSlot && createPortal(headerActions, tabHeaderSlot)}
+                {slot && createPortal(headerActions, slot)}
                 {children}
                 {footer}
             </>

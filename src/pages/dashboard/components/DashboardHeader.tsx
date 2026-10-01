@@ -6,7 +6,7 @@ import { inject } from '@services';
 
 import { Button, showContextMenu, type ContextMenuItem } from '@components';
 
-import type { Dashboard } from '@types';
+import { DashboardLayoutMode, type Dashboard } from '@types';
 
 import { DashboardName } from './DashboardName';
 
@@ -16,6 +16,12 @@ interface DashboardHeaderProps {
     userId: string;
     onShowGadgets: () => void;
     tabViewChanged: (isTabView: boolean) => void;
+    layoutModeChanged: (mode: number) => void;
+    resetGridLayout: () => void;
+    tidyGridLayout: () => void;
+    isGrid?: boolean;
+    gridEditMode?: boolean;
+    onGridEditModeChange?: (editing: boolean) => void;
     isQuickView?: boolean;
 }
 
@@ -25,6 +31,12 @@ export function DashboardHeader({
     userId,
     onShowGadgets,
     tabViewChanged,
+    layoutModeChanged,
+    resetGridLayout,
+    tidyGridLayout,
+    isGrid,
+    gridEditMode,
+    onGridEditModeChange,
     isQuickView,
 }: DashboardHeaderProps) {
     const [config, setConfig] = useState(initialConfig);
@@ -82,6 +94,39 @@ export function DashboardHeader({
             ];
 
             if (!isQuickView) {
+                const gridActive = config.layout === DashboardLayoutMode.Grid;
+
+                menu.push({
+                    label: gridActive ? 'Switch to classic layout' : 'Switch to resizable grid',
+                    icon: <span className={gridActive ? 'fa fa-th-large' : 'fa fa-th'} />,
+                    command: () => layoutModeChanged(gridActive ? DashboardLayoutMode.Classic : DashboardLayoutMode.Grid),
+                    disabled: config.isTabView,
+                    value: '',
+                } as ContextMenuItem);
+
+                if (gridActive && !config.isTabView) {
+                    menu.push({
+                        label: gridEditMode ? 'Finish arranging' : 'Arrange gadgets',
+                        icon: <span className={gridEditMode ? 'fa fa-check' : 'fa fa-arrows'} />,
+                        command: () => onGridEditModeChange?.(!gridEditMode),
+                        value: '',
+                    } as ContextMenuItem);
+
+                    menu.push({
+                        label: 'Tidy up (close gaps)',
+                        icon: <span className="fa fa-compress" />,
+                        command: tidyGridLayout,
+                        value: '',
+                    } as ContextMenuItem);
+
+                    menu.push({
+                        label: 'Reset gadget positions',
+                        icon: <span className="fa fa-undo" />,
+                        command: resetGridLayout,
+                        value: '',
+                    } as ContextMenuItem);
+                }
+
                 menu.push({
                     label: config.isTabView ? 'Disable tab view' : 'Show in tabs',
                     icon: <span className={config.isTabView ? 'fa fa-check-square' : 'fa fa-square'} />,
@@ -100,7 +145,20 @@ export function DashboardHeader({
 
             showContextMenu(e, menu as any);
         },
-        [$dashboard, deleteDashboard, setAsTabView, setAsQuickView, config, index, isQuickView],
+        [
+            $dashboard,
+            deleteDashboard,
+            setAsTabView,
+            setAsQuickView,
+            config,
+            index,
+            isQuickView,
+            layoutModeChanged,
+            resetGridLayout,
+            tidyGridLayout,
+            gridEditMode,
+            onGridEditModeChange,
+        ],
     );
 
     return (
@@ -109,6 +167,17 @@ export function DashboardHeader({
                 <DashboardName icon={config.icon} value={config.name} onChange={nameChanged} />
             </div>
             <div className="flex items-center gap-1 shrink-0">
+                {isGrid && (
+                    <Button
+                        layout={gridEditMode ? 'default' : 'outlined'}
+                        variant={gridEditMode ? 'success' : 'secondary'}
+                        size="sm"
+                        leftIcon={<i className={`fa fa-${gridEditMode ? 'check' : 'arrows'}`} />}
+                        label={gridEditMode ? 'Done' : 'Arrange'}
+                        onClick={() => onGridEditModeChange?.(!gridEditMode)}
+                        title={gridEditMode ? 'Finish arranging gadgets' : 'Drag and resize gadgets'}
+                    />
+                )}
                 <Button
                     layout="outlined"
                     variant="primary"

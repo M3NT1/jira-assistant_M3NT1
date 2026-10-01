@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useParams } from 'react-router-dom';
 
@@ -10,7 +10,7 @@ import { inject } from '@services';
 
 import { TabPage, TabView } from '@components';
 
-import type { Dashboard as DashboardType, Widget } from '@types';
+import { DashboardLayoutMode, type Dashboard as DashboardType, type DashboardGridLayouts, type Widget } from '@types';
 
 import AddWorklog from '@dialogs/AddWorklog';
 
@@ -18,8 +18,10 @@ import { dashboardEventEmitter } from '../../gadgets/BaseGadget';
 
 import { AddGadget } from './components/AddGadget';
 import { DashboardHeader } from './components/DashboardHeader';
+import { GadgetGrid } from './components/GadgetGrid';
 import './Dashboard.css';
 import { getGadgetComponent } from './gadget-registry';
+import { compactLayouts, ensureWidgetIds, generateLayouts, isGridLayout, reconcileLayouts } from './layout-utils';
 
 interface GadgetAction {
     type: number;
@@ -29,6 +31,24 @@ interface GadgetAction {
 function loadBoardAtIndex(dashboards: DashboardType[], index: number) {
     const actualIndex = index >= dashboards.length ? 0 : index;
     return dashboards[actualIndex] ?? null;
+}
+
+/**
+ * Boards stored before grid layout existed have no widget ids. Backfill them in place so
+ * the session copy and the grid agree, and report whether the board needs saving.
+ */
+function prepareBoard(board: DashboardType | null): { board: DashboardType | null; changed: boolean } {
+    if (!board?.widgets?.length) {
+        return { board, changed: false };
+    }
+
+    const { widgets, changed } = ensureWidgetIds(board.widgets);
+    if (!changed) {
+        return { board, changed: false };
+    }
+
+    board.widgets = widgets;
+    return { board, changed: true };
 }
 
 export default function Dashboard() {
@@ -41,18 +61,24 @@ export default function Dashboard() {
 
     const dashboards: DashboardType[] = $session.CurrentUser?.dashboards || [];
     const quickView = $session.isQuickView || false;
-    const initialBoard = loadBoardAtIndex(dashboards, dashboardIndex);
+    const initialBoard = prepareBoard(loadBoardAtIndex(dashboards, dashboardIndex)).board;
 
     const [currentBoard, setCurrentBoard] = useState<DashboardType | null>(initialBoard);
     const currentBoardRef = useRef<DashboardType | null>(initialBoard);
     const [isTabView, setIsTabView] = useState(quickView || initialBoard?.isTabView || false);
+    const [gridEditMode, setGridEditMode] = useState(false);
 
     useEffect(() => {
         dashboardIndexRef.current = dashboardIndex;
-        const board = loadBoardAtIndex(dashboards, dashboardIndex);
+        const { board, changed } = prepareBoard(loadBoardAtIndex(dashboards, dashboardIndex));
         currentBoardRef.current = board;
         setCurrentBoard(board);
         setIsTabView(quickView || board?.isTabView || false);
+        setGridEditMode(false);
+
+        if (changed && board) {
+            $dashboard.saveDashboardInfo(dashboardIndex, board);
+        }
     }, [dashboardIndex]); // eslint-disable-line react-hooks/exhaustive-deps
     const [showGadgetPanel, setShowGadgetPanel] = useState(false);
     const [showWorklogPopup, setShowWorklogPopup] = useState(false);
@@ -73,7 +99,8 @@ export default function Dashboard() {
     const addGadget = (gadgetName: string, settings?: any) => {
         if (!currentBoardRef.current) return;
         const updatedBoard = { ...currentBoardRef.current };
-        updatedBoard.widgets = [...(updatedBoard.widgets || []), { name: gadgetName, settings: settings || {} }];
+        const appended = [...(updatedBoard.widgets || []), { name: gadgetName, settings: settings || {} }];
+        updatedBoard.widgets = ensureWidgetIds(appended).widgets;
         updateCurrentBoard(updatedBoard);
     };
 
@@ -127,7 +154,32 @@ export default function Dashboard() {
         saveDashboardInfo(updatedBoard);
     };
 
-    const renderGadget = (widget: Widget, index: number, dragDropProps?: any) => {
+    const isGrid = isGridLayout(currentBoard) && !isTabView && !quickView;
+
+    // Stored placements are reconciled with the live widget list, so gadgets added or
+    // removed while in classic mode still get a slot when grid mode is turned back on
+    const gridLayouts = useMemo(
+        () => (isGrid ? reconcileLayouts(currentBoard?.widgets || [], currentBoard?.layouts) : {}),
+        [isGrid, currentBoard?.widgets, currentBoard?.layouts],
+    );
+
+    const layoutsChanged = useCallback(
+        (layouts: DashboardGridLayouts) => {
+            if (!currentBoardRef.current) return;
+            const updatedBoard = { ...currentBoardRef.current, layouts };
+            updateCurrentBoard(updatedBoard);
+            saveDashboardInfo(updatedBoard);
+        },
+        [], // eslint-disable-line react-hooks/exhaustive-deps
+    );
+
+    const gadgetTitle = useCallback((widget: Widget) => {
+        const nameOpts = (widget.name || '').split(':');
+        const registered = getGadgetComponent(nameOpts[0], nameOpts.slice(1));
+        return registered?.props?.title || nameOpts[0];
+    }, []);
+
+    const renderGadget = (widget: Widget, index: number, dragDropProps?: any, hostHeaderSlot?: HTMLElement) => {
         const { name, settings = {} } = widget;
         const nameOpts = name.split(':');
         const gadgetName = nameOpts[0];
@@ -141,11 +193,13 @@ export default function Dashboard() {
 
         const { Component, props: additionalProps } = GadgetComponent;
 
-        const key = `${gadgetName}_${opts[0] || index}`;
+        const key = widget.id || `${gadgetName}_${opts[0] || index}`;
         const gadgetProps = {
             gadgetType: gadgetName,
             tabLayout: isTabView,
             tabHeaderSlot: isTabView ? tabHeaderSlot : null,
+            hostedChrome: !!hostHeaderSlot,
+            hostHeaderSlot: hostHeaderSlot || null,
             index,
             model: widget,
             settings,
@@ -169,6 +223,11 @@ export default function Dashboard() {
         return <Component key={key} {...gadgetProps} />;
     };
 
+    const renderGridGadget = useCallback(
+        (widget: Widget, index: number, headerSlot: HTMLElement) => renderGadget(widget, index, undefined, headerSlot),
+        [renderGadget], // eslint-disable-line react-hooks/exhaustive-deps
+    );
+
     const renderGadgets = () => {
         const widgets = currentBoard?.widgets || [];
 
@@ -190,6 +249,20 @@ export default function Dashboard() {
                 >
                     {widgets.map((widget, index) => renderGadget(widget, index))}
                 </TabView>
+            );
+        }
+
+        if (isGrid) {
+            return (
+                <GadgetGrid
+                    widgets={widgets}
+                    layouts={gridLayouts}
+                    editMode={gridEditMode}
+                    onEditModeChange={setGridEditMode}
+                    onLayoutsChange={layoutsChanged}
+                    renderGadget={renderGridGadget}
+                    gadgetTitle={gadgetTitle}
+                />
             );
         }
 
@@ -225,6 +298,40 @@ export default function Dashboard() {
         setIsTabView(newIsTabView);
     };
 
+    const layoutModeChanged = useCallback((mode: number) => {
+        const board = currentBoardRef.current;
+        if (!board) return;
+
+        const updatedBoard: DashboardType = { ...board, layout: mode };
+
+        // Seed placements on the first switch so gadgets do not all land on top of each other
+        if (mode === DashboardLayoutMode.Grid && !updatedBoard.layouts) {
+            updatedBoard.layouts = generateLayouts(updatedBoard.widgets || []);
+        }
+
+        updateCurrentBoard(updatedBoard);
+        saveDashboardInfo(updatedBoard);
+        setGridEditMode(mode === DashboardLayoutMode.Grid);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const resetGridLayout = useCallback(() => {
+        const board = currentBoardRef.current;
+        if (!board) return;
+
+        const updatedBoard: DashboardType = { ...board, layouts: generateLayouts(board.widgets || []) };
+        updateCurrentBoard(updatedBoard);
+        saveDashboardInfo(updatedBoard);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const tidyGridLayout = useCallback(() => {
+        const board = currentBoardRef.current;
+        if (!board?.layouts) return;
+
+        const updatedBoard: DashboardType = { ...board, layouts: compactLayouts(board.layouts) };
+        updateCurrentBoard(updatedBoard);
+        saveDashboardInfo(updatedBoard);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
     if (!currentBoard) {
         return <div className="p-4 text-secondary">Loading dashboard...</div>;
     }
@@ -248,6 +355,12 @@ export default function Dashboard() {
                         userId={$session.userId?.toString()!}
                         onShowGadgets={onShowGadgets}
                         tabViewChanged={tabViewChanged}
+                        layoutModeChanged={layoutModeChanged}
+                        resetGridLayout={resetGridLayout}
+                        tidyGridLayout={tidyGridLayout}
+                        isGrid={isGrid}
+                        gridEditMode={gridEditMode}
+                        onGridEditModeChange={setGridEditMode}
                         isQuickView={quickView}
                     />
                 )}

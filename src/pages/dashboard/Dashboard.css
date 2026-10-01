@@ -1,4 +1,6 @@
-.dashboard-gadgets {
+/* Scoped under .dashboard-container so it beats fluxo-ui's .eui-sortable (same specificity
+   otherwise, which would make the layout depend on stylesheet injection order) */
+.dashboard-container .dashboard-gadgets {
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
@@ -16,4 +18,29 @@
     .eui-tab-page {
         padding: 0;
     }
+}
+
+/* Resizable grid mode: the grid cell defines the size, so the gadget must fill it
+   instead of using the classic half/full vh heights. */
+.ja-gadget-grid {
+    width: 100%;
+}
+
+/* The cell itself scrolls. Gadgets contribute several siblings (stat rows, tables,
+   charts), so stretching each one with flex:1 would split the cell between them. */
+.ja-gadget-grid .eui-dashboard-widget-body {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: auto;
+    padding: 0;
+}
+
+/* ScrollableTable normally claims height:100% and scrolls internally, which fights the
+   cell's own scrollbar. In a grid cell let the table render at full length and let the
+   cell scroll instead — sticky headers then stick to the cell. */
+.ja-gadget-grid .eui-dashboard-widget-body .scroll-table-container {
+    flex: 0 0 auto;
+    height: auto;
+    overflow: visible;
 }

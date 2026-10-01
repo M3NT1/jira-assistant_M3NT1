@@ -352,11 +352,41 @@ export interface SprintVelocityReport {
     logUnavailable: boolean;
 }
 
+/**
+ * Presentation mode of a dashboard. Historically `Dashboard.layout` was always 1 and
+ * read by nobody, so it is reused here as the mode discriminator: boards stored before
+ * this change keep working because 1 means the original flow layout.
+ */
+export const DashboardLayoutMode = {
+    /** Wrapped flow of half/full width gadgets — the original behaviour */
+    Classic: 1,
+    /** Freely positioned, resizable grid */
+    Grid: 2,
+} as const;
+
+export type DashboardLayoutModeValue = (typeof DashboardLayoutMode)[keyof typeof DashboardLayoutMode];
+
+/** Grid placement of one widget, in grid units */
+export interface WidgetGridPosition {
+    id: string;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    minW?: number;
+    minH?: number;
+}
+
+/** Grid placements keyed by breakpoint (xs / sm / md / lg / xl) */
+export type DashboardGridLayouts = Record<string, WidgetGridPosition[]>;
+
 export interface Dashboard {
     id: number;
     name: string;
     icon: string;
     layout: number;
+    /** Only present once the board has been switched to grid mode */
+    layouts?: DashboardGridLayouts;
     widgets: Widget[];
     isQuickView?: boolean;
     isTabView?: boolean;
@@ -364,6 +394,8 @@ export interface Dashboard {
 
 export interface Widget {
     name: string;
+    /** Stable identifier; backfilled for boards stored before grid layout existed */
+    id?: string;
     [key: string]: any;
 }
 
