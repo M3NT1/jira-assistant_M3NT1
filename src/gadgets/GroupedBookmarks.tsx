@@ -41,6 +41,12 @@ interface BookmarkItem {
     rowClass: string;
 }
 
+/**
+ * The shared table style gives every column at least 150px; the selection and group columns
+ * only need their content, so they shrink to it and leave the room to the other columns
+ */
+const fitToContent: React.CSSProperties = { minWidth: 0, width: 1 };
+
 interface GroupEditorProps {
     initial: string;
     listId: string;
@@ -387,10 +393,12 @@ export default function GroupedBookmarks(props: BaseGadgetProps) {
                 <ScrollableTable dataset={visible} sortBy={sort.sortBy} isDesc={sort.isDesc} onSort={sortChanged} exportSheetName="Grouped bookmarks">
                     <THead>
                         <tr>
-                            <Column className="w-10" noExport>
+                            <Column style={fitToContent} noExport>
                                 <Checkbox checked={allVisibleSelected} onChange={selectAllVisible} />
                             </Column>
-                            <Column sortBy="group">Group</Column>
+                            <Column sortBy="group" style={fitToContent}>
+                                Group
+                            </Column>
                             <Column sortBy="ticketNo">Ticket No</Column>
                             <Column sortBy="issuetype">Type</Column>
                             <Column sortBy="summary">Summary</Column>
@@ -434,7 +442,12 @@ export default function GroupedBookmarks(props: BaseGadgetProps) {
                                             aria-label={b.group ? `Group: ${b.group}. Change` : 'Set group'}
                                         >
                                             {b.group ? (
-                                                <span className="inline-block px-2 py-0.5 rounded bg-(--bg-secondary) text-sm">{b.group}</span>
+                                                <span
+                                                    className="inline-block max-w-56 truncate align-middle px-2 py-0.5 rounded bg-(--bg-secondary) text-sm"
+                                                    title={b.group}
+                                                >
+                                                    {b.group}
+                                                </span>
                                             ) : (
                                                 // Drawn with ::after so the hint never ends up in an export as cell text
                                                 <span className="text-xs text-secondary opacity-0 group-hover/cell:opacity-100 group-focus-visible/cell:opacity-100 after:content-['+_Set_group']" />
